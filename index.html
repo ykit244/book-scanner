@@ -291,6 +291,36 @@
             hideMessages();
 
             try {
+                // Preprocess image for better OCR
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = reject;
+                    img.src = image.src;
+                });
+
+                canvas.width = img.width;
+                canvas.height = img.height;
+                
+                // Draw image
+                ctx.drawImage(img, 0, 0);
+                
+                // Increase contrast
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imageData.data;
+                const factor = 1.5;
+                for (let i = 0; i < data.length; i += 4) {
+                    data[i] = Math.min(255, data[i] * factor);     // Red
+                    data[i + 1] = Math.min(255, data[i + 1] * factor); // Green
+                    data[i + 2] = Math.min(255, data[i + 2] * factor); // Blue
+                }
+                ctx.putImageData(imageData, 0, 0);
+                
+                const processedImage = canvas.toDataURL('image/png');
+
                 const worker = await Tesseract.createWorker('eng', 1, {
                     logger: info => {
                         console.log(info);
@@ -314,14 +344,22 @@
                     }
                 });
 
-                const result = await worker.recognize(image.src);
+                const result = await worker.recognize(processedImage);
                 await worker.terminate();
 
-                document.getElementById('extracted-text').value = result.data.text;
-                document.getElementById('text-section').style.display = 'block';
-                document.getElementById('page-section').style.display = 'block';
-                document.getElementById('notes-section').style.display = 'block';
-                status.textContent = 'Text extracted successfully!';
+                const extractedText = result.data.text.trim();
+                
+                if (!extractedText || extractedText.length < 5) {
+                    status.textContent = 'No text detected. Try taking a clearer photo with better lighting.';
+                    document.getElementById('extracted-text').value = '';
+                } else {
+                    document.getElementById('extracted-text').value = extractedText;
+                    document.getElementById('text-section').style.display = 'block';
+                    document.getElementById('page-section').style.display = 'block';
+                    document.getElementById('notes-section').style.display = 'block';
+                    status.textContent = 'Text extracted successfully!';
+                }
+                
                 progressBar.style.display = 'none';
                 
             } catch (error) {
