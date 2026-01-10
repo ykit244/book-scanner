@@ -1,8 +1,8 @@
 // Vercel Serverless Function to save data to Notion
 // File location: api/save-to-notion.js
 
-const NOTION_TOKEN = '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';
-const DATABASE_ID = '2e4c43e40672801ebafddb45e167081d';
+const NOTION_TOKEN = process.env.NOTION_TOKEN;
+const DATABASE_ID = process.env.NOTION_DATABASE_ID;
 
 export default async function handler(req, res) {
   // Enable CORS
