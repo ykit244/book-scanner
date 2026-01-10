@@ -1,4 +1,10 @@
-// Vercel Serverless Function to save data to Notion
+try {
+    const { text, notes, pageNumber, bookTitle } = req.body;
+
+    // Prepare properties for Notion
+    const properties = {};
+
+    // Name/Title property (// Vercel Serverless Function to save data to Notion
 // File location: api/save-to-notion.js
 
 const NOTION_TOKEN = process.env.NOTION_TOKEN;
@@ -22,8 +28,16 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Check if environment variables are set
+  if (!NOTION_TOKEN || !DATABASE_ID) {
+    return res.status(500).json({ 
+      error: 'Server configuration error',
+      message: 'Environment variables not set. Please add NOTION_TOKEN and NOTION_DATABASE_ID in Vercel settings.'
+    });
+  }
+
   try {
-    const { text, notes, pageNumber } = req.body;
+    const { text, notes, pageNumber, bookTitle } = req.body;
 
     // Prepare properties for Notion
     const properties = {
@@ -31,12 +45,26 @@ export default async function handler(req, res) {
         title: [
           {
             text: {
-              content: text ? text.substring(0, 100) : 'Untitled'
+              // Use Book Title if provided, otherwise use truncated text, otherwise "Untitled"
+              content: bookTitle || (text ? text.substring(0, 100) : 'Untitled')
             }
           }
         ]
       }
     };
+
+    // Add Book Title as a separate property if provided
+    if (bookTitle) {
+      properties['Book Title'] = {
+        rich_text: [
+          {
+            text: {
+              content: bookTitle
+            }
+          }
+        ]
+      };
+    }
 
     // Add Text property if it exists
     if (text) {
