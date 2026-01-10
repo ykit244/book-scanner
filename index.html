@@ -162,39 +162,13 @@
             font-weight: 500;
         }
 
-        .save-btn:active {
+        .save-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .save-btn:active:not(:disabled) {
             background: #4240B8;
-        }
-
-        .saved-items {
-            margin-top: 32px;
-            display: none;
-        }
-
-        .saved-item {
-            background: #f9f9f9;
-            padding: 16px;
-            border-radius: 8px;
-            margin-bottom: 12px;
-            border-left: 4px solid #007AFF;
-        }
-
-        .saved-item-text {
-            color: #333;
-            margin-bottom: 8px;
-            font-size: 15px;
-        }
-
-        .saved-item-note {
-            color: #666;
-            font-size: 14px;
-            font-style: italic;
-        }
-
-        .saved-item-date {
-            color: #999;
-            font-size: 12px;
-            margin-top: 8px;
         }
 
         .progress-bar {
@@ -213,11 +187,31 @@
             width: 0%;
             transition: width 0.3s;
         }
+
+        .success-message {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 16px;
+            display: none;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 16px;
+            display: none;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📚 Book Scanner</h1>
+        <h1>📚 Book Scanner (English)</h1>
 
         <div class="camera-section">
             <input type="file" id="camera-input" accept="image/*" capture="environment">
@@ -250,20 +244,21 @@
         <div class="notes-section" id="notes-section">
             <label for="notes-input">Your Notes:</label>
             <textarea class="notes-input" id="notes-input" placeholder="Add your notes here..."></textarea>
-            <button class="save-btn" onclick="saveToLocal()">
-                💾 Save
+            <button class="save-btn" id="save-btn" onclick="saveToNotion()">
+                💾 Save to Notion
             </button>
         </div>
 
-        <div class="saved-items" id="saved-items">
-            <h2 style="margin-bottom: 16px; font-size: 20px; color: #333;">Saved Items</h2>
-            <div id="saved-list"></div>
+        <div class="success-message" id="success-message">
+            ✅ Successfully saved to Notion!
+        </div>
+
+        <div class="error-message" id="error-message">
+            ❌ <span id="error-text"></span>
         </div>
     </div>
 
     <script>
-        let savedItems = [];
-
         document.getElementById('camera-input').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
@@ -272,8 +267,10 @@
                     document.getElementById('preview-image').src = event.target.result;
                     document.getElementById('preview-section').style.display = 'block';
                     document.getElementById('text-section').style.display = 'none';
+                    document.getElementById('page-section').style.display = 'none';
                     document.getElementById('notes-section').style.display = 'none';
                     document.getElementById('status').textContent = '';
+                    hideMessages();
                 };
                 reader.readAsDataURL(file);
             }
@@ -288,24 +285,37 @@
 
             btn.disabled = true;
             btn.textContent = 'Processing...';
-            status.textContent = 'Extracting text from image...';
+            status.textContent = 'Initializing OCR engine...';
             progressBar.style.display = 'block';
             progressFill.style.width = '0%';
+            hideMessages();
 
             try {
-                const result = await Tesseract.recognize(
-                    image.src,
-                    'eng+chi_sim+chi_tra',
-                    {
-                        logger: info => {
-                            if (info.status === 'recognizing text') {
-                                const progress = Math.round(info.progress * 100);
-                                progressFill.style.width = progress + '%';
-                                status.textContent = `Processing: ${progress}%`;
-                            }
+                const worker = await Tesseract.createWorker('eng', 1, {
+                    logger: info => {
+                        console.log(info);
+                        if (info.status === 'loading tesseract core') {
+                            status.textContent = 'Loading OCR engine...';
+                            progressFill.style.width = '10%';
+                        } else if (info.status === 'initializing tesseract') {
+                            status.textContent = 'Initializing engine...';
+                            progressFill.style.width = '20%';
+                        } else if (info.status === 'loading language traineddata') {
+                            status.textContent = 'Loading English language data...';
+                            progressFill.style.width = '30%';
+                        } else if (info.status === 'initializing api') {
+                            status.textContent = 'Preparing recognition...';
+                            progressFill.style.width = '50%';
+                        } else if (info.status === 'recognizing text') {
+                            const progress = 50 + Math.round(info.progress * 50);
+                            progressFill.style.width = progress + '%';
+                            status.textContent = `Recognizing text: ${Math.round(info.progress * 100)}%`;
                         }
                     }
-                );
+                });
+
+                const result = await worker.recognize(image.src);
+                await worker.terminate();
 
                 document.getElementById('extracted-text').value = result.data.text;
                 document.getElementById('text-section').style.display = 'block';
@@ -315,64 +325,85 @@
                 progressBar.style.display = 'none';
                 
             } catch (error) {
-                status.textContent = 'Error extracting text. Please try again.';
-                console.error(error);
+                status.textContent = 'Error extracting text: ' + error.message;
+                console.error('OCR Error:', error);
+                progressBar.style.display = 'none';
             }
 
             btn.disabled = false;
             btn.textContent = 'Extract Text';
         }
 
-        function saveToLocal() {
+        async function saveToNotion() {
             const text = document.getElementById('extracted-text').value;
             const notes = document.getElementById('notes-input').value;
             const pageNumber = document.getElementById('page-number').value;
+            const saveBtn = document.getElementById('save-btn');
 
             if (!text && !notes) {
-                alert('Please add some text or notes before saving.');
+                showError('Please add some text or notes before saving.');
                 return;
             }
 
-            const item = {
-                text: text,
-                notes: notes,
-                pageNumber: pageNumber,
-                date: new Date().toLocaleString()
-            };
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+            hideMessages();
 
-            savedItems.unshift(item);
-            displaySavedItems();
+            try {
+                const response = await fetch('/api/save-to-notion', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        text: text,
+                        notes: notes,
+                        pageNumber: pageNumber ? parseInt(pageNumber) : null
+                    })
+                });
 
-            alert('Saved! (Note: This is stored locally. We\'ll add Notion integration next.)');
-            
-            // Reset form
-            document.getElementById('extracted-text').value = '';
-            document.getElementById('notes-input').value = '';
-            document.getElementById('page-number').value = '';
-            document.getElementById('preview-section').style.display = 'none';
-            document.getElementById('text-section').style.display = 'none';
-            document.getElementById('page-section').style.display = 'none';
-            document.getElementById('notes-section').style.display = 'none';
+                const data = await response.json();
+
+                if (response.ok) {
+                    showSuccess();
+                    // Reset form
+                    document.getElementById('extracted-text').value = '';
+                    document.getElementById('notes-input').value = '';
+                    document.getElementById('page-number').value = '';
+                    document.getElementById('preview-section').style.display = 'none';
+                    document.getElementById('text-section').style.display = 'none';
+                    document.getElementById('page-section').style.display = 'none';
+                    document.getElementById('notes-section').style.display = 'none';
+                } else {
+                    showError(data.error || 'Failed to save to Notion');
+                }
+            } catch (error) {
+                console.error('Save error:', error);
+                showError('Network error. Please check your connection and try again.');
+            }
+
+            saveBtn.disabled = false;
+            saveBtn.textContent = '💾 Save to Notion';
         }
 
-        function displaySavedItems() {
-            const savedList = document.getElementById('saved-list');
-            const savedSection = document.getElementById('saved-items');
+        function showSuccess() {
+            const successMsg = document.getElementById('success-message');
+            successMsg.style.display = 'block';
+            setTimeout(() => {
+                successMsg.style.display = 'none';
+            }, 5000);
+        }
 
-            if (savedItems.length === 0) {
-                savedSection.style.display = 'none';
-                return;
-            }
+        function showError(message) {
+            const errorMsg = document.getElementById('error-message');
+            const errorText = document.getElementById('error-text');
+            errorText.textContent = message;
+            errorMsg.style.display = 'block';
+        }
 
-            savedSection.style.display = 'block';
-            savedList.innerHTML = savedItems.map(item => `
-                <div class="saved-item">
-                    ${item.pageNumber ? `<div class="saved-item-date" style="margin-bottom: 8px;"><strong>Page ${item.pageNumber}</strong></div>` : ''}
-                    <div class="saved-item-text">${item.text || '(No text)'}</div>
-                    ${item.notes ? `<div class="saved-item-note">Note: ${item.notes}</div>` : ''}
-                    <div class="saved-item-date">${item.date}</div>
-                </div>
-            `).join('');
+        function hideMessages() {
+            document.getElementById('success-message').style.display = 'none';
+            document.getElementById('error-message').style.display = 'none';
         }
     </script>
 </body>
