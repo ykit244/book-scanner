@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Scanner</title>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.0/tesseract.min.js'></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 24px;
+            font-size: 24px;
+        }
+
+        .camera-section {
+            margin-bottom: 24px;
+        }
+
+        #camera-input {
+            display: none;
+        }
+
+        .camera-btn {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 14px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: 500;
+        }
+
+        .camera-btn:active {
+            background: #0051D5;
+        }
+
+        .preview-section {
+            margin-bottom: 24px;
+            display: none;
+        }
+
+        #preview-image {
+            width: 100%;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+
+        .process-btn {
+            background: #34C759;
+            color: white;
+            border: none;
+            padding: 14px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: 500;
+        }
+
+        .process-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .process-btn:active:not(:disabled) {
+            background: #2DA94B;
+        }
+
+        .status {
+            text-align: center;
+            color: #666;
+            margin: 16px 0;
+            font-size: 14px;
+        }
+
+        .text-section {
+            margin-bottom: 24px;
+            display: none;
+        }
+
+        .text-section label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .extracted-text {
+            width: 100%;
+            min-height: 150px;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: inherit;
+            resize: vertical;
+            margin-bottom: 16px;
+        }
+
+        .page-section {
+            display: none;
+            margin-bottom: 16px;
+        }
+
+        .page-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: inherit;
+        }
+
+        .notes-section {
+            display: none;
+        }
+
+        .notes-input {
+            width: 100%;
+            min-height: 100px;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: inherit;
+            resize: vertical;
+            margin-bottom: 16px;
+        }
+
+        .save-btn {
+            background: #5856D6;
+            color: white;
+            border: none;
+            padding: 14px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: 500;
+        }
+
+        .save-btn:active {
+            background: #4240B8;
+        }
+
+        .saved-items {
+            margin-top: 32px;
+            display: none;
+        }
+
+        .saved-item {
+            background: #f9f9f9;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border-left: 4px solid #007AFF;
+        }
+
+        .saved-item-text {
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+
+        .saved-item-note {
+            color: #666;
+            font-size: 14px;
+            font-style: italic;
+        }
+
+        .saved-item-date {
+            color: #999;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 16px 0;
+            display: none;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #007AFF;
+            width: 0%;
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📚 Book Scanner</h1>
+
+        <div class="camera-section">
+            <input type="file" id="camera-input" accept="image/*" capture="environment">
+            <button class="camera-btn" onclick="document.getElementById('camera-input').click()">
+                📷 Take Photo
+            </button>
+        </div>
+
+        <div class="preview-section" id="preview-section">
+            <img id="preview-image" src="" alt="Preview">
+            <button class="process-btn" id="process-btn" onclick="processImage()">
+                Extract Text
+            </button>
+            <div class="progress-bar" id="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <div class="status" id="status"></div>
+        </div>
+
+        <div class="text-section" id="text-section">
+            <label for="extracted-text">Extracted Text (select and edit as needed):</label>
+            <textarea class="extracted-text" id="extracted-text"></textarea>
+        </div>
+
+        <div class="page-section" id="page-section">
+            <label for="page-number">Page Number:</label>
+            <input type="number" class="page-input" id="page-number" placeholder="Enter page number" min="1">
+        </div>
+
+        <div class="notes-section" id="notes-section">
+            <label for="notes-input">Your Notes:</label>
+            <textarea class="notes-input" id="notes-input" placeholder="Add your notes here..."></textarea>
+            <button class="save-btn" onclick="saveToLocal()">
+                💾 Save
+            </button>
+        </div>
+
+        <div class="saved-items" id="saved-items">
+            <h2 style="margin-bottom: 16px; font-size: 20px; color: #333;">Saved Items</h2>
+            <div id="saved-list"></div>
+        </div>
+    </div>
+
+    <script>
+        let savedItems = [];
+
+        document.getElementById('camera-input').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    document.getElementById('preview-image').src = event.target.result;
+                    document.getElementById('preview-section').style.display = 'block';
+                    document.getElementById('text-section').style.display = 'none';
+                    document.getElementById('notes-section').style.display = 'none';
+                    document.getElementById('status').textContent = '';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        async function processImage() {
+            const btn = document.getElementById('process-btn');
+            const status = document.getElementById('status');
+            const progressBar = document.getElementById('progress-bar');
+            const progressFill = document.getElementById('progress-fill');
+            const image = document.getElementById('preview-image');
+
+            btn.disabled = true;
+            btn.textContent = 'Processing...';
+            status.textContent = 'Extracting text from image...';
+            progressBar.style.display = 'block';
+            progressFill.style.width = '0%';
+
+            try {
+                const result = await Tesseract.recognize(
+                    image.src,
+                    'eng+chi_sim+chi_tra',
+                    {
+                        logger: info => {
+                            if (info.status === 'recognizing text') {
+                                const progress = Math.round(info.progress * 100);
+                                progressFill.style.width = progress + '%';
+                                status.textContent = `Processing: ${progress}%`;
+                            }
+                        }
+                    }
+                );
+
+                document.getElementById('extracted-text').value = result.data.text;
+                document.getElementById('text-section').style.display = 'block';
+                document.getElementById('page-section').style.display = 'block';
+                document.getElementById('notes-section').style.display = 'block';
+                status.textContent = 'Text extracted successfully!';
+                progressBar.style.display = 'none';
+                
+            } catch (error) {
+                status.textContent = 'Error extracting text. Please try again.';
+                console.error(error);
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Extract Text';
+        }
+
+        function saveToLocal() {
+            const text = document.getElementById('extracted-text').value;
+            const notes = document.getElementById('notes-input').value;
+            const pageNumber = document.getElementById('page-number').value;
+
+            if (!text && !notes) {
+                alert('Please add some text or notes before saving.');
+                return;
+            }
+
+            const item = {
+                text: text,
+                notes: notes,
+                pageNumber: pageNumber,
+                date: new Date().toLocaleString()
+            };
+
+            savedItems.unshift(item);
+            displaySavedItems();
+
+            alert('Saved! (Note: This is stored locally. We\'ll add Notion integration next.)');
+            
+            // Reset form
+            document.getElementById('extracted-text').value = '';
+            document.getElementById('notes-input').value = '';
+            document.getElementById('page-number').value = '';
+            document.getElementById('preview-section').style.display = 'none';
+            document.getElementById('text-section').style.display = 'none';
+            document.getElementById('page-section').style.display = 'none';
+            document.getElementById('notes-section').style.display = 'none';
+        }
+
+        function displaySavedItems() {
+            const savedList = document.getElementById('saved-list');
+            const savedSection = document.getElementById('saved-items');
+
+            if (savedItems.length === 0) {
+                savedSection.style.display = 'none';
+                return;
+            }
+
+            savedSection.style.display = 'block';
+            savedList.innerHTML = savedItems.map(item => `
+                <div class="saved-item">
+                    ${item.pageNumber ? `<div class="saved-item-date" style="margin-bottom: 8px;"><strong>Page ${item.pageNumber}</strong></div>` : ''}
+                    <div class="saved-item-text">${item.text || '(No text)'}</div>
+                    ${item.notes ? `<div class="saved-item-note">Note: ${item.notes}</div>` : ''}
+                    <div class="saved-item-date">${item.date}</div>
+                </div>
+            `).join('');
+        }
+    </script>
+</body>
+</html>
