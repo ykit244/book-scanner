@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Book Scanner</title>
-    <script src='https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.0/tesseract.min.js'></script>
     <style>
         * {
             margin: 0;
@@ -120,6 +119,20 @@
             margin-bottom: 16px;
         }
 
+        .book-title-section {
+            display: none;
+            margin-bottom: 16px;
+        }
+
+        .book-title-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: inherit;
+        }
+
         .page-section {
             display: none;
             margin-bottom: 16px;
@@ -211,13 +224,16 @@
 </head>
 <body>
     <div class="container">
-        <h1>📚 Book Scanner (English)</h1>
+        <h1>📚 Book Scanner</h1>
 
         <div class="camera-section">
             <input type="file" id="camera-input" accept="image/*" capture="environment">
             <button class="camera-btn" onclick="document.getElementById('camera-input').click()">
                 📷 Take Photo
             </button>
+            <p style="margin-top: 12px; font-size: 14px; color: #666; text-align: center;">
+                💡 Supports English & Chinese text
+            </p>
         </div>
 
         <div class="preview-section" id="preview-section">
@@ -234,6 +250,11 @@
         <div class="text-section" id="text-section">
             <label for="extracted-text">Extracted Text (select and edit as needed):</label>
             <textarea class="extracted-text" id="extracted-text"></textarea>
+        </div>
+
+        <div class="book-title-section" id="book-title-section">
+            <label for="book-title">Book Title:</label>
+            <input type="text" class="book-title-input" id="book-title" placeholder="Enter book title">
         </div>
 
         <div class="page-section" id="page-section">
@@ -285,87 +306,59 @@
 
             btn.disabled = true;
             btn.textContent = 'Processing...';
-            status.textContent = 'Initializing OCR engine...';
+            status.textContent = 'Sending image to OCR service...';
             progressBar.style.display = 'block';
-            progressFill.style.width = '0%';
+            progressFill.style.width = '30%';
             hideMessages();
 
             try {
-                // Preprocess image for better OCR
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                const img = new Image();
-                
-                await new Promise((resolve, reject) => {
-                    img.onload = resolve;
-                    img.onerror = reject;
-                    img.src = image.src;
+                // Send image to backend for Google Vision API processing
+                const response = await fetch('/api/extract-text', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        image: image.src
+                    })
                 });
 
-                canvas.width = img.width;
-                canvas.height = img.height;
-                
-                // Draw image
-                ctx.drawImage(img, 0, 0);
-                
-                // Increase contrast
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const data = imageData.data;
-                const factor = 1.5;
-                for (let i = 0; i < data.length; i += 4) {
-                    data[i] = Math.min(255, data[i] * factor);     // Red
-                    data[i + 1] = Math.min(255, data[i + 1] * factor); // Green
-                    data[i + 2] = Math.min(255, data[i + 2] * factor); // Blue
+                progressFill.style.width = '70%';
+                status.textContent = 'Processing text...';
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to extract text');
                 }
-                ctx.putImageData(imageData, 0, 0);
+
+                progressFill.style.width = '100%';
+
+                const extractedText = data.text ? data.text.trim() : '';
                 
-                const processedImage = canvas.toDataURL('image/png');
-
-                const worker = await Tesseract.createWorker('eng', 1, {
-                    logger: info => {
-                        console.log(info);
-                        if (info.status === 'loading tesseract core') {
-                            status.textContent = 'Loading OCR engine...';
-                            progressFill.style.width = '10%';
-                        } else if (info.status === 'initializing tesseract') {
-                            status.textContent = 'Initializing engine...';
-                            progressFill.style.width = '20%';
-                        } else if (info.status === 'loading language traineddata') {
-                            status.textContent = 'Loading English language data...';
-                            progressFill.style.width = '30%';
-                        } else if (info.status === 'initializing api') {
-                            status.textContent = 'Preparing recognition...';
-                            progressFill.style.width = '50%';
-                        } else if (info.status === 'recognizing text') {
-                            const progress = 50 + Math.round(info.progress * 50);
-                            progressFill.style.width = progress + '%';
-                            status.textContent = `Recognizing text: ${Math.round(info.progress * 100)}%`;
-                        }
-                    }
-                });
-
-                const result = await worker.recognize(processedImage);
-                await worker.terminate();
-
-                const extractedText = result.data.text.trim();
-                
-                if (!extractedText || extractedText.length < 5) {
+                if (!extractedText || extractedText.length < 3) {
                     status.textContent = 'No text detected. Try taking a clearer photo with better lighting.';
                     document.getElementById('extracted-text').value = '';
+                    progressBar.style.display = 'none';
                 } else {
                     document.getElementById('extracted-text').value = extractedText;
                     document.getElementById('text-section').style.display = 'block';
+                    document.getElementById('book-title-section').style.display = 'block';
                     document.getElementById('page-section').style.display = 'block';
                     document.getElementById('notes-section').style.display = 'block';
-                    status.textContent = 'Text extracted successfully!';
+                    
+                    const confidenceMsg = data.confidence 
+                        ? ` (Confidence: ${Math.round(data.confidence * 100)}%)` 
+                        : '';
+                    status.textContent = `Text extracted successfully!${confidenceMsg}`;
+                    progressBar.style.display = 'none';
                 }
                 
-                progressBar.style.display = 'none';
-                
             } catch (error) {
-                status.textContent = 'Error extracting text: ' + error.message;
+                status.textContent = 'Error: ' + error.message;
                 console.error('OCR Error:', error);
                 progressBar.style.display = 'none';
+                showError('Failed to extract text. Please try again.');
             }
 
             btn.disabled = false;
@@ -376,6 +369,7 @@
             const text = document.getElementById('extracted-text').value;
             const notes = document.getElementById('notes-input').value;
             const pageNumber = document.getElementById('page-number').value;
+            const bookTitle = document.getElementById('book-title').value;
             const saveBtn = document.getElementById('save-btn');
 
             if (!text && !notes) {
@@ -396,7 +390,8 @@
                     body: JSON.stringify({
                         text: text,
                         notes: notes,
-                        pageNumber: pageNumber ? parseInt(pageNumber) : null
+                        pageNumber: pageNumber ? parseInt(pageNumber) : null,
+                        bookTitle: bookTitle
                     })
                 });
 
@@ -408,8 +403,10 @@
                     document.getElementById('extracted-text').value = '';
                     document.getElementById('notes-input').value = '';
                     document.getElementById('page-number').value = '';
+                    document.getElementById('book-title').value = '';
                     document.getElementById('preview-section').style.display = 'none';
                     document.getElementById('text-section').style.display = 'none';
+                    document.getElementById('book-title-section').style.display = 'none';
                     document.getElementById('page-section').style.display = 'none';
                     document.getElementById('notes-section').style.display = 'none';
                 } else {
