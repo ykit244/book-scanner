@@ -1,4 +1,5 @@
 {
-  "type": "module",
-  "dependencies": {}
+  "name": "book-scanner",
+  "version": "1.0.0",
+  "private": true
 }
