@@ -329,7 +329,8 @@
                 const data = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(data.error || 'Failed to extract text');
+                    console.error('API Error:', data);
+                    throw new Error(data.details || data.error || 'Failed to extract text');
                 }
 
                 progressFill.style.width = '100%';

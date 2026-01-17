@@ -89,7 +89,12 @@ module.exports = async function handler(req, res) {
     }
 
     // First annotation contains all detected text
-    const extractedText = textAnnotations[0].description;
+    let extractedText = textAnnotations[0].description || '';
+    
+    // Clean the text to remove problematic characters
+    extractedText = extractedText
+      .replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F\u007F-\u009F]/g, '') // Remove control characters but keep newlines
+      .trim();
 
     return res.status(200).json({ 
       text: extractedText,
