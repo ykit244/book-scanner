@@ -30,7 +30,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const { image, boundingBox } = req.body;
+    const { image } = req.body;
 
     if (!image) {
       return res.status(400).json({ error: 'No image provided' });
@@ -39,25 +39,6 @@ module.exports = async function handler(req, res) {
     // Remove data URL prefix if present (data:image/png;base64,)
     const base64Image = image.replace(/^data:image\/\w+;base64,/, '');
 
-    // Build the request for Vision API
-    const visionRequest = {
-      image: {
-        content: base64Image
-      },
-      features: [
-        {
-          type: 'TEXT_DETECTION',
-          maxResults: 1
-        }
-      ],
-      imageContext: {
-        languageHints: ['en', 'zh-CN', 'zh-TW'] // English, Simplified Chinese, Traditional Chinese
-      }
-    };
-
-    // If bounding box is provided, crop the image or filter results
-    // Note: Vision API doesn't support direct region selection, so we'll filter results by coordinates
-    
     // Call Google Cloud Vision API
     const visionResponse = await fetch(
       `https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_VISION_API_KEY}`,
@@ -67,7 +48,22 @@ module.exports = async function handler(req, res) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          requests: [visionRequest]
+          requests: [
+            {
+              image: {
+                content: base64Image
+              },
+              features: [
+                {
+                  type: 'TEXT_DETECTION',
+                  maxResults: 1
+                }
+              ],
+              imageContext: {
+                languageHints: ['en', 'zh-CN', 'zh-TW'] // English, Simplified Chinese, Traditional Chinese
+              }
+            }
+          ]
         })
       }
     );
@@ -92,31 +88,8 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    let extractedText = '';
-
-    // If bounding box is provided, filter text annotations within the box
-    if (boundingBox && textAnnotations.length > 1) {
-      const { x1, y1, x2, y2 } = boundingBox;
-      
-      // Skip first annotation (full text) and check individual words
-      const filteredAnnotations = textAnnotations.slice(1).filter(annotation => {
-        const vertices = annotation.boundingPoly.vertices;
-        if (!vertices || vertices.length === 0) return false;
-        
-        // Get center point of the text bounding box
-        const centerX = vertices.reduce((sum, v) => sum + (v.x || 0), 0) / vertices.length;
-        const centerY = vertices.reduce((sum, v) => sum + (v.y || 0), 0) / vertices.length;
-        
-        // Check if center is within selection box
-        return centerX >= x1 && centerX <= x2 && centerY >= y1 && centerY <= y2;
-      });
-      
-      // Combine filtered text
-      extractedText = filteredAnnotations.map(a => a.description).join(' ');
-    } else {
-      // No bounding box - use full text
-      extractedText = textAnnotations[0].description || '';
-    }
+    // First annotation contains all detected text
+    let extractedText = textAnnotations[0].description || '';
     
     // Clean the text to remove problematic characters
     extractedText = extractedText

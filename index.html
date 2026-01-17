@@ -65,29 +65,6 @@
             width: 100%;
             border-radius: 8px;
             margin-bottom: 16px;
-            cursor: crosshair;
-            position: relative;
-        }
-
-        .image-container {
-            position: relative;
-            display: inline-block;
-            width: 100%;
-        }
-
-        .selection-box {
-            position: absolute;
-            border: 2px dashed #007AFF;
-            background: rgba(0, 122, 255, 0.1);
-            pointer-events: none;
-        }
-
-        .selection-hint {
-            text-align: center;
-            color: #007AFF;
-            font-size: 13px;
-            margin-bottom: 12px;
-            display: none;
         }
 
         .process-btn {
@@ -271,13 +248,7 @@
         </div>
 
         <div class="preview-section" id="preview-section">
-            <div class="selection-hint" id="selection-hint">
-                💡 Drag on the image to select text region (optional)
-            </div>
-            <div class="image-container">
-                <img id="preview-image" src="" alt="Preview">
-                <div class="selection-box" id="selection-box"></div>
-            </div>
+            <img id="preview-image" src="" alt="Preview">
             <button class="process-btn" id="process-btn" onclick="processImage()">
                 Extract Text
             </button>
@@ -323,9 +294,6 @@
     </div>
 
     <script>
-        let selectionStart = null;
-        let selectionEnd = null;
-        let isSelecting = false;
         let booksList = [];
 
         // Load books list on page load
@@ -373,86 +341,6 @@
             }
         }
 
-        // Image selection functionality
-        const previewImage = document.getElementById('preview-image');
-        const selectionBox = document.getElementById('selection-box');
-
-        previewImage.addEventListener('mousedown', startSelection);
-        previewImage.addEventListener('mousemove', updateSelection);
-        previewImage.addEventListener('mouseup', endSelection);
-        previewImage.addEventListener('mouseleave', endSelection);
-
-        // Touch support for mobile
-        previewImage.addEventListener('touchstart', handleTouchStart);
-        previewImage.addEventListener('touchmove', handleTouchMove);
-        previewImage.addEventListener('touchend', endSelection);
-
-        function handleTouchStart(e) {
-            e.preventDefault();
-            const touch = e.touches[0];
-            const rect = previewImage.getBoundingClientRect();
-            const x = touch.clientX - rect.left;
-            const y = touch.clientY - rect.top;
-            startSelection({ offsetX: x, offsetY: y });
-        }
-
-        function handleTouchMove(e) {
-            e.preventDefault();
-            const touch = e.touches[0];
-            const rect = previewImage.getBoundingClientRect();
-            const x = touch.clientX - rect.left;
-            const y = touch.clientY - rect.top;
-            updateSelection({ offsetX: x, offsetY: y });
-        }
-
-        function startSelection(e) {
-            isSelecting = true;
-            const rect = previewImage.getBoundingClientRect();
-            selectionStart = {
-                x: e.offsetX || (e.clientX - rect.left),
-                y: e.offsetY || (e.clientY - rect.top)
-            };
-            selectionBox.style.display = 'none';
-        }
-
-        function updateSelection(e) {
-            if (!isSelecting) return;
-            
-            const rect = previewImage.getBoundingClientRect();
-            const currentX = e.offsetX || (e.clientX - rect.left);
-            const currentY = e.offsetY || (e.clientY - rect.top);
-            
-            const left = Math.min(selectionStart.x, currentX);
-            const top = Math.min(selectionStart.y, currentY);
-            const width = Math.abs(currentX - selectionStart.x);
-            const height = Math.abs(currentY - selectionStart.y);
-            
-            selectionBox.style.left = left + 'px';
-            selectionBox.style.top = top + 'px';
-            selectionBox.style.width = width + 'px';
-            selectionBox.style.height = height + 'px';
-            selectionBox.style.display = 'block';
-        }
-
-        function endSelection(e) {
-            if (!isSelecting) return;
-            isSelecting = false;
-            
-            const rect = previewImage.getBoundingClientRect();
-            const currentX = e.offsetX || (e.changedTouches ? e.changedTouches[0].clientX - rect.left : 0);
-            const currentY = e.offsetY || (e.changedTouches ? e.changedTouches[0].clientY - rect.top : 0);
-            
-            if (currentX && currentY) {
-                selectionEnd = { x: currentX, y: currentY };
-            }
-        }
-
-        function clearSelection() {
-            selectionStart = null;
-            selectionEnd = null;
-            selectionBox.style.display = 'none';
-        }
-
         document.getElementById('camera-input').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
@@ -485,43 +373,15 @@
             hideMessages();
 
             try {
-                // Prepare the request body
-                const requestBody = {
-                    image: image.src
-                };
-
-                // If user made a selection, include the bounding box
-                if (selectionStart && selectionEnd) {
-                    const imgElement = image;
-                    const imgWidth = imgElement.naturalWidth;
-                    const imgHeight = imgElement.naturalHeight;
-                    const displayWidth = imgElement.clientWidth;
-                    const displayHeight = imgElement.clientHeight;
-
-                    // Convert display coordinates to actual image coordinates
-                    const scaleX = imgWidth / displayWidth;
-                    const scaleY = imgHeight / displayHeight;
-
-                    const x1 = Math.min(selectionStart.x, selectionEnd.x) * scaleX;
-                    const y1 = Math.min(selectionStart.y, selectionEnd.y) * scaleY;
-                    const x2 = Math.max(selectionStart.x, selectionEnd.x) * scaleX;
-                    const y2 = Math.max(selectionStart.y, selectionEnd.y) * scaleY;
-
-                    requestBody.boundingBox = {
-                        x1: Math.round(x1),
-                        y1: Math.round(y1),
-                        x2: Math.round(x2),
-                        y2: Math.round(y2)
-                    };
-                }
-
                 // Send image to backend for Google Vision API processing
                 const response = await fetch('/api/extract-text', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(requestBody)
+                    body: JSON.stringify({
+                        image: image.src
+                    })
                 });
 
                 progressFill.style.width = '70%';
