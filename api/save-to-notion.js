@@ -1,10 +1,4 @@
-try {
-    const { text, notes, pageNumber, bookTitle } = req.body;
-
-    // Prepare properties for Notion
-    const properties = {};
-
-    // Name/Title property (// Vercel Serverless Function to save data to Notion
+// Vercel Serverless Function to save data to Notion
 // File location: api/save-to-notion.js
 
 const NOTION_TOKEN = process.env.NOTION_TOKEN;
