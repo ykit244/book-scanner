@@ -516,10 +516,9 @@
         document.getElementById('camera-input').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    // Add image to array
-                    capturedImages.push(event.target.result);
+                compressImage(file, function(compressedDataUrl) {
+                    // Add compressed image to array
+                    capturedImages.push(compressedDataUrl);
                     updateImagesPreview();
                     
                     // Show preview section
@@ -530,13 +529,55 @@
                     document.getElementById('notes-section').style.display = 'none';
                     document.getElementById('status').textContent = '';
                     hideMessages();
-                };
-                reader.readAsDataURL(file);
+                });
             }
             
             // Reset input so same file can be selected again
             e.target.value = '';
         });
+
+        function compressImage(file, callback) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Set max dimensions (adjust these if needed)
+                    const MAX_WIDTH = 1600;
+                    const MAX_HEIGHT = 1600;
+                    
+                    let width = img.width;
+                    let height = img.height;
+                    
+                    // Calculate new dimensions while maintaining aspect ratio
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    
+                    // Draw and compress
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // Convert to JPEG with quality 0.85 (adjust quality if needed)
+                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                    callback(compressedDataUrl);
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
 
         function updateImagesPreview() {
             const grid = document.getElementById('images-grid');
