@@ -67,6 +67,45 @@
             margin-bottom: 16px;
         }
 
+        .orientation-section {
+            margin-bottom: 16px;
+        }
+
+        .orientation-section label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .orientation-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .orientation-btn {
+            background: #f0f0f0;
+            color: #333;
+            border: 2px solid #ddd;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .orientation-btn.active {
+            background: #007AFF;
+            color: white;
+            border-color: #007AFF;
+        }
+
+        .orientation-btn:active {
+            transform: scale(0.98);
+        }
+
         .process-btn {
             background: #34C759;
             color: white;
@@ -231,6 +270,16 @@
             margin-top: 16px;
             display: none;
         }
+
+        .info-box {
+            background: #e3f2fd;
+            border: 1px solid #90caf9;
+            color: #1565c0;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 8px;
+            font-size: 13px;
+        }
     </style>
 </head>
 <body>
@@ -249,6 +298,24 @@
 
         <div class="preview-section" id="preview-section">
             <img id="preview-image" src="" alt="Preview">
+            
+            <div class="orientation-section">
+                <label>Text Orientation:</label>
+                <div class="orientation-buttons">
+                    <button class="orientation-btn active" data-orientation="horizontal" onclick="selectOrientation('horizontal')">
+                        ➡️ Horizontal<br>
+                        <small style="font-weight: normal; opacity: 0.8;">(Left to Right)</small>
+                    </button>
+                    <button class="orientation-btn" data-orientation="vertical" onclick="selectOrientation('vertical')">
+                        ⬇️ Vertical<br>
+                        <small style="font-weight: normal; opacity: 0.8;">(Top to Bottom)</small>
+                    </button>
+                </div>
+                <div class="info-box">
+                    ℹ️ Select <strong>Vertical</strong> for traditional Chinese books that read from right to left
+                </div>
+            </div>
+            
             <button class="process-btn" id="process-btn" onclick="processImage()">
                 Extract Text
             </button>
@@ -295,6 +362,7 @@
 
     <script>
         let booksList = [];
+        let selectedOrientation = 'horizontal';
 
         // Load books list on page load
         window.addEventListener('DOMContentLoaded', loadBooks);
@@ -326,6 +394,19 @@
                 const select = document.getElementById('book-title-select');
                 select.innerHTML = '<option value="other">📝 Manual Input</option>';
             }
+        }
+
+        function selectOrientation(orientation) {
+            selectedOrientation = orientation;
+            
+            // Update button states
+            document.querySelectorAll('.orientation-btn').forEach(btn => {
+                if (btn.dataset.orientation === orientation) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
         }
 
         function handleBookTitleChange() {
@@ -380,7 +461,8 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        image: image.src
+                        image: image.src,
+                        orientation: selectedOrientation
                     })
                 });
 
@@ -475,7 +557,8 @@
                     document.getElementById('extracted-text').value = '';
                     document.getElementById('notes-input').value = '';
                     document.getElementById('page-number').value = '';
-                    document.getElementById('book-title').value = '';
+                    document.getElementById('book-title-select').value = '';
+                    document.getElementById('book-title-input').value = '';
                     document.getElementById('preview-section').style.display = 'none';
                     document.getElementById('text-section').style.display = 'none';
                     document.getElementById('book-title-section').style.display = 'none';
