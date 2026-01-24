@@ -56,15 +56,80 @@
             background: #0051D5;
         }
 
+        .images-preview {
+            display: none;
+            margin-bottom: 16px;
+        }
+
+        .images-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .image-item {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #ddd;
+        }
+
+        .image-item img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .image-number {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .remove-image {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: #FF3B30;
+            color: white;
+            border: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 24px;
+            padding: 0;
+        }
+
+        .add-another-btn {
+            background: #34C759;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: 500;
+            margin-bottom: 12px;
+        }
+
+        .add-another-btn:active {
+            background: #2DA94B;
+        }
+
         .preview-section {
             margin-bottom: 24px;
             display: none;
-        }
-
-        #preview-image {
-            width: 100%;
-            border-radius: 8px;
-            margin-bottom: 16px;
         }
 
         .orientation-section {
@@ -107,7 +172,7 @@
         }
 
         .process-btn {
-            background: #34C759;
+            background: #FF9500;
             color: white;
             border: none;
             padding: 14px 24px;
@@ -124,7 +189,7 @@
         }
 
         .process-btn:active:not(:disabled) {
-            background: #2DA94B;
+            background: #CC7700;
         }
 
         .status {
@@ -280,6 +345,23 @@
             margin-top: 8px;
             font-size: 13px;
         }
+
+        .clear-all-btn {
+            background: #FF3B30;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: 500;
+            margin-bottom: 16px;
+        }
+
+        .clear-all-btn:active {
+            background: #CC2E24;
+        }
     </style>
 </head>
 <body>
@@ -292,13 +374,21 @@
                 📷 Take Photo
             </button>
             <p style="margin-top: 12px; font-size: 14px; color: #666; text-align: center;">
-                💡 Supports English & Chinese text
+                💡 Supports English & Chinese text • Multiple pages
             </p>
         </div>
 
+        <div class="images-preview" id="images-preview">
+            <div class="images-grid" id="images-grid"></div>
+            <button class="add-another-btn" onclick="document.getElementById('camera-input').click()">
+                ➕ Add Another Page
+            </button>
+            <button class="clear-all-btn" onclick="clearAllImages()">
+                🗑️ Clear All Images
+            </button>
+        </div>
+
         <div class="preview-section" id="preview-section">
-            <img id="preview-image" src="" alt="Preview">
-            
             <div class="orientation-section">
                 <label>Text Orientation:</label>
                 <div class="orientation-buttons">
@@ -316,8 +406,8 @@
                 </div>
             </div>
             
-            <button class="process-btn" id="process-btn" onclick="processImage()">
-                Extract Text
+            <button class="process-btn" id="process-btn" onclick="processImages()">
+                📝 Extract Text from All Images
             </button>
             <div class="progress-bar" id="progress-bar">
                 <div class="progress-fill" id="progress-fill"></div>
@@ -363,6 +453,7 @@
     <script>
         let booksList = [];
         let selectedOrientation = 'horizontal';
+        let capturedImages = []; // Array to store multiple images
 
         // Load books list on page load
         window.addEventListener('DOMContentLoaded', loadBooks);
@@ -427,9 +518,14 @@
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(event) {
-                    document.getElementById('preview-image').src = event.target.result;
+                    // Add image to array
+                    capturedImages.push(event.target.result);
+                    updateImagesPreview();
+                    
+                    // Show preview section
                     document.getElementById('preview-section').style.display = 'block';
                     document.getElementById('text-section').style.display = 'none';
+                    document.getElementById('book-title-section').style.display = 'none';
                     document.getElementById('page-section').style.display = 'none';
                     document.getElementById('notes-section').style.display = 'none';
                     document.getElementById('status').textContent = '';
@@ -437,64 +533,126 @@
                 };
                 reader.readAsDataURL(file);
             }
+            
+            // Reset input so same file can be selected again
+            e.target.value = '';
         });
 
-        async function processImage() {
+        function updateImagesPreview() {
+            const grid = document.getElementById('images-grid');
+            const imagesPreview = document.getElementById('images-preview');
+            
+            if (capturedImages.length === 0) {
+                imagesPreview.style.display = 'none';
+                return;
+            }
+            
+            imagesPreview.style.display = 'block';
+            grid.innerHTML = '';
+            
+            capturedImages.forEach((imageSrc, index) => {
+                const imageItem = document.createElement('div');
+                imageItem.className = 'image-item';
+                imageItem.innerHTML = `
+                    <img src="${imageSrc}" alt="Page ${index + 1}">
+                    <div class="image-number">${index + 1}</div>
+                    <button class="remove-image" onclick="removeImage(${index})">×</button>
+                `;
+                grid.appendChild(imageItem);
+            });
+        }
+
+        function removeImage(index) {
+            capturedImages.splice(index, 1);
+            updateImagesPreview();
+            
+            if (capturedImages.length === 0) {
+                document.getElementById('preview-section').style.display = 'none';
+            }
+        }
+
+        function clearAllImages() {
+            capturedImages = [];
+            updateImagesPreview();
+            document.getElementById('preview-section').style.display = 'none';
+            document.getElementById('text-section').style.display = 'none';
+            document.getElementById('book-title-section').style.display = 'none';
+            document.getElementById('page-section').style.display = 'none';
+            document.getElementById('notes-section').style.display = 'none';
+        }
+
+        async function processImages() {
             const btn = document.getElementById('process-btn');
             const status = document.getElementById('status');
             const progressBar = document.getElementById('progress-bar');
             const progressFill = document.getElementById('progress-fill');
-            const image = document.getElementById('preview-image');
+
+            if (capturedImages.length === 0) {
+                showError('Please add at least one image first.');
+                return;
+            }
 
             btn.disabled = true;
             btn.textContent = 'Processing...';
-            status.textContent = 'Sending image to OCR service...';
             progressBar.style.display = 'block';
-            progressFill.style.width = '30%';
             hideMessages();
 
+            let allExtractedText = '';
+
             try {
-                // Send image to backend for Google Vision API processing
-                const response = await fetch('/api/extract-text', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        image: image.src,
-                        orientation: selectedOrientation
-                    })
-                });
+                for (let i = 0; i < capturedImages.length; i++) {
+                    const imageNum = i + 1;
+                    const totalImages = capturedImages.length;
+                    
+                    status.textContent = `Processing image ${imageNum} of ${totalImages}...`;
+                    progressFill.style.width = `${(i / totalImages) * 70}%`;
 
-                progressFill.style.width = '70%';
-                status.textContent = 'Processing text...';
+                    // Send image to backend for Google Vision API processing
+                    const response = await fetch('/api/extract-text', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            image: capturedImages[i],
+                            orientation: selectedOrientation
+                        })
+                    });
 
-                const data = await response.json();
+                    const data = await response.json();
 
-                if (!response.ok) {
-                    console.error('API Error:', data);
-                    throw new Error(data.details || data.error || 'Failed to extract text');
+                    if (!response.ok) {
+                        console.error('API Error:', data);
+                        throw new Error(data.details || data.error || 'Failed to extract text');
+                    }
+
+                    const extractedText = data.text ? data.text.trim() : '';
+                    
+                    if (extractedText) {
+                        // Add the text with proper spacing
+                        if (allExtractedText) {
+                            // Add a space or newline between texts from different pages
+                            allExtractedText += '\n\n' + extractedText;
+                        } else {
+                            allExtractedText = extractedText;
+                        }
+                    }
                 }
 
                 progressFill.style.width = '100%';
 
-                const extractedText = data.text ? data.text.trim() : '';
-                
-                if (!extractedText || extractedText.length < 3) {
-                    status.textContent = 'No text detected. Try taking a clearer photo with better lighting.';
+                if (!allExtractedText || allExtractedText.length < 3) {
+                    status.textContent = 'No text detected. Try taking clearer photos with better lighting.';
                     document.getElementById('extracted-text').value = '';
                     progressBar.style.display = 'none';
                 } else {
-                    document.getElementById('extracted-text').value = extractedText;
+                    document.getElementById('extracted-text').value = allExtractedText;
                     document.getElementById('text-section').style.display = 'block';
                     document.getElementById('book-title-section').style.display = 'block';
                     document.getElementById('page-section').style.display = 'block';
                     document.getElementById('notes-section').style.display = 'block';
                     
-                    const confidenceMsg = data.confidence 
-                        ? ` (Confidence: ${Math.round(data.confidence * 100)}%)` 
-                        : '';
-                    status.textContent = `Text extracted successfully!${confidenceMsg}`;
+                    status.textContent = `Successfully extracted text from ${capturedImages.length} image(s)!`;
                     progressBar.style.display = 'none';
                 }
                 
@@ -506,7 +664,7 @@
             }
 
             btn.disabled = false;
-            btn.textContent = 'Extract Text';
+            btn.textContent = '📝 Extract Text from All Images';
         }
 
         async function saveToNotion() {
@@ -554,6 +712,8 @@
                 if (response.ok) {
                     showSuccess();
                     // Reset form
+                    capturedImages = [];
+                    updateImagesPreview();
                     document.getElementById('extracted-text').value = '';
                     document.getElementById('notes-input').value = '';
                     document.getElementById('page-number').value = '';
