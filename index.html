@@ -641,8 +641,8 @@
                 </div>
 
                 <div class="field-group">
-                    <label>Article Text Preview:</label>
-                    <div class="text-preview" id="article-text-preview"></div>
+                    <label for="article-text-preview">Article Text:</label>
+                    <textarea class="field-input" id="article-text-preview" rows="6" placeholder="Paste or type article text here..." oninput="articleBodyText = this.value"></textarea>
                     <div class="text-preview-label" id="article-text-length"></div>
                 </div>
 
@@ -1064,14 +1064,12 @@
 
                 articleBodyText = data.bodyText || '';
                 const preview = document.getElementById('article-text-preview');
-                preview.textContent = articleBodyText.substring(0, 400);
+                preview.value = articleBodyText;
 
                 const lengthEl = document.getElementById('article-text-length');
-                if (articleBodyText) {
-                    lengthEl.textContent = `Full text: ~${articleBodyText.length.toLocaleString()} characters — will be saved to the Notion page body.`;
-                } else {
-                    lengthEl.textContent = 'No article text extracted.';
-                }
+                lengthEl.textContent = articleBodyText
+                    ? `~${articleBodyText.length.toLocaleString()} characters — will be saved to the Notion page body.`
+                    : 'No text extracted. You can paste the article text manually above.';
 
                 document.getElementById('article-fields').style.display = 'block';
                 status.textContent = '';
