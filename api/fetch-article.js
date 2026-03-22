@@ -30,7 +30,10 @@ module.exports = async function handler(req, res) {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
+      return res.status(200).json({
+        title: '', author: '', releaseDate: '', language: 'Other', bodyText: '',
+        warning: `Could not fetch this page (${response.status}). This site may require login or block automated access (e.g. Facebook, Instagram). Please fill in the fields manually.`,
+      });
     }
 
     const html = await response.text();

@@ -1049,7 +1049,12 @@
                     throw new Error(data.error || 'Failed to fetch article');
                 }
 
-                // Populate fields
+                // Show warning if site blocked the fetch (fields will be empty for manual entry)
+                if (data.warning) {
+                    showArticleError(data.warning);
+                }
+
+                // Populate fields (may be empty if site was blocked)
                 document.getElementById('article-title').value = data.title || '';
                 document.getElementById('article-author').value = data.author || '';
                 document.getElementById('article-date').value = data.releaseDate || '';
