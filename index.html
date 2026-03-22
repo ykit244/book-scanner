@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Book Scanner</title>
+    <title>Reading Bookmark Tool</title>
     <style>
         * {
             margin: 0;
@@ -362,11 +362,140 @@
         .clear-all-btn:active {
             background: #CC2E24;
         }
+
+        /* ── Tabs ── */
+        .tabs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 24px;
+        }
+
+        .tab-btn {
+            background: #f0f0f0;
+            color: #333;
+            border: 2px solid #ddd;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            background: #007AFF;
+            color: white;
+            border-color: #007AFF;
+        }
+
+        /* ── Article Bookmark ── */
+        .field-group {
+            margin-bottom: 16px;
+        }
+
+        .field-group label {
+            display: block;
+            margin-bottom: 6px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .field-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: inherit;
+            box-sizing: border-box;
+        }
+
+        .field-input:focus {
+            outline: none;
+            border-color: #007AFF;
+        }
+
+        .fetch-btn {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 14px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: 500;
+            margin-top: 4px;
+        }
+
+        .fetch-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .fetch-btn:active:not(:disabled) {
+            background: #0051D5;
+        }
+
+        .article-fields {
+            display: none;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+            margin-top: 20px;
+        }
+
+        .article-fields-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 16px;
+        }
+
+        .text-preview {
+            background: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 13px;
+            color: #555;
+            line-height: 1.5;
+            max-height: 120px;
+            overflow: hidden;
+            position: relative;
+            margin-bottom: 4px;
+        }
+
+        .text-preview::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 40px;
+            background: linear-gradient(transparent, #f8f8f8);
+        }
+
+        .text-preview-label {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 16px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📚 Book Scanner</h1>
+        <h1>📖 Reading Bookmark Tool</h1>
+
+        <div class="tabs">
+            <button class="tab-btn active" id="tab-btn-book" onclick="switchTab('book')">📚 Book Scanner</button>
+            <button class="tab-btn" id="tab-btn-article" onclick="switchTab('article')">🔖 Article Bookmark</button>
+        </div>
+
+        <!-- ══ Book Scanner Tab ══ -->
+        <div id="tab-book">
 
         <div class="camera-section">
             <input type="file" id="camera-input" accept="image/*" capture="environment">
@@ -448,6 +577,90 @@
         <div class="error-message" id="error-message">
             ❌ <span id="error-text"></span>
         </div>
+
+        </div><!-- end #tab-book -->
+
+        <!-- ══ Article Bookmark Tab ══ -->
+        <div id="tab-article" style="display:none">
+
+            <div class="field-group">
+                <label for="article-url">Article URL:</label>
+                <input type="url" class="field-input" id="article-url" placeholder="https://...">
+            </div>
+
+            <div class="field-group">
+                <label for="article-category">Category:</label>
+                <select class="field-input" id="article-category">
+                    <option value="General">General</option>
+                    <option value="Environmental">Environmental</option>
+                    <option value="Culture & History">Culture &amp; History</option>
+                    <option value="Economics & Management">Economics &amp; Management</option>
+                    <option value="Hobbies">Hobbies</option>
+                    <option value="Investment & Financial">Investment &amp; Financial</option>
+                    <option value="Law">Law</option>
+                    <option value="Politics & Social Sciences">Politics &amp; Social Sciences</option>
+                    <option value="Psychology">Psychology</option>
+                    <option value="Sciences & Technology">Sciences &amp; Technology</option>
+                    <option value="Self Help">Self Help</option>
+                    <option value="Philosophy">Philosophy</option>
+                </select>
+            </div>
+
+            <button class="fetch-btn" id="fetch-btn" onclick="fetchArticle()">
+                🔍 Fetch Article
+            </button>
+
+            <div class="status" id="article-status"></div>
+
+            <!-- Extracted fields — shown after fetch -->
+            <div class="article-fields" id="article-fields">
+                <div class="article-fields-title">Review &amp; Edit Before Saving</div>
+
+                <div class="field-group">
+                    <label for="article-title">Title:</label>
+                    <input type="text" class="field-input" id="article-title">
+                </div>
+
+                <div class="field-group">
+                    <label for="article-author">Author:</label>
+                    <input type="text" class="field-input" id="article-author" placeholder="Leave blank if unknown">
+                </div>
+
+                <div class="field-group">
+                    <label for="article-date">Release Date:</label>
+                    <input type="date" class="field-input" id="article-date">
+                </div>
+
+                <div class="field-group">
+                    <label for="article-language">Language:</label>
+                    <select class="field-input" id="article-language">
+                        <option value="English">English</option>
+                        <option value="Chinese">Chinese</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <div class="field-group">
+                    <label>Article Text Preview:</label>
+                    <div class="text-preview" id="article-text-preview"></div>
+                    <div class="text-preview-label" id="article-text-length"></div>
+                </div>
+
+                <button class="save-btn" id="article-save-btn" onclick="saveArticleToNotion()">
+                    💾 Save to Notion
+                </button>
+            </div>
+
+            <div class="success-message" id="article-success-message">
+                ✅ Successfully saved to Notion!
+            </div>
+
+            <div class="error-message" id="article-error-message">
+                ❌ <span id="article-error-text"></span>
+            </div>
+
+        </div><!-- end #tab-article -->
+
     </div>
 
     <script>
@@ -795,6 +1008,131 @@
         function hideMessages() {
             document.getElementById('success-message').style.display = 'none';
             document.getElementById('error-message').style.display = 'none';
+        }
+
+        // ── Tab switching ──────────────────────────────────────────────
+        function switchTab(tab) {
+            document.getElementById('tab-book').style.display = tab === 'book' ? 'block' : 'none';
+            document.getElementById('tab-article').style.display = tab === 'article' ? 'block' : 'none';
+            document.getElementById('tab-btn-book').classList.toggle('active', tab === 'book');
+            document.getElementById('tab-btn-article').classList.toggle('active', tab === 'article');
+        }
+
+        // ── Article Bookmark ───────────────────────────────────────────
+        let articleBodyText = '';
+
+        async function fetchArticle() {
+            const url = document.getElementById('article-url').value.trim();
+            if (!url) {
+                showArticleError('Please enter a URL.');
+                return;
+            }
+
+            const btn = document.getElementById('fetch-btn');
+            const status = document.getElementById('article-status');
+            btn.disabled = true;
+            btn.textContent = 'Fetching…';
+            status.textContent = 'Reading article…';
+            document.getElementById('article-fields').style.display = 'none';
+            hideArticleMessages();
+
+            try {
+                const response = await fetch('/api/fetch-article', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url }),
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to fetch article');
+                }
+
+                // Populate fields
+                document.getElementById('article-title').value = data.title || '';
+                document.getElementById('article-author').value = data.author || '';
+                document.getElementById('article-date').value = data.releaseDate || '';
+
+                const langSelect = document.getElementById('article-language');
+                langSelect.value = data.language || 'Other';
+
+                articleBodyText = data.bodyText || '';
+                const preview = document.getElementById('article-text-preview');
+                preview.textContent = articleBodyText.substring(0, 400);
+
+                const lengthEl = document.getElementById('article-text-length');
+                if (articleBodyText) {
+                    lengthEl.textContent = `Full text: ~${articleBodyText.length.toLocaleString()} characters — will be saved to the Notion page body.`;
+                } else {
+                    lengthEl.textContent = 'No article text extracted.';
+                }
+
+                document.getElementById('article-fields').style.display = 'block';
+                status.textContent = '';
+
+            } catch (error) {
+                status.textContent = '';
+                showArticleError(error.message || 'Failed to fetch article. Check the URL and try again.');
+            }
+
+            btn.disabled = false;
+            btn.textContent = '🔍 Fetch Article';
+        }
+
+        async function saveArticleToNotion() {
+            const saveBtn = document.getElementById('article-save-btn');
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving…';
+            hideArticleMessages();
+
+            try {
+                const response = await fetch('/api/save-article-to-notion', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        url: document.getElementById('article-url').value.trim(),
+                        title: document.getElementById('article-title').value.trim(),
+                        author: document.getElementById('article-author').value.trim(),
+                        releaseDate: document.getElementById('article-date').value,
+                        language: document.getElementById('article-language').value,
+                        category: document.getElementById('article-category').value,
+                        bodyText: articleBodyText,
+                    }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    document.getElementById('article-success-message').style.display = 'block';
+                    setTimeout(() => {
+                        document.getElementById('article-success-message').style.display = 'none';
+                    }, 5000);
+                    // Reset form
+                    document.getElementById('article-url').value = '';
+                    document.getElementById('article-category').value = 'General';
+                    document.getElementById('article-fields').style.display = 'none';
+                    articleBodyText = '';
+                } else {
+                    showArticleError(data.error || 'Failed to save to Notion.');
+                }
+            } catch (error) {
+                showArticleError('Network error. Please check your connection and try again.');
+            }
+
+            saveBtn.disabled = false;
+            saveBtn.textContent = '💾 Save to Notion';
+        }
+
+        function showArticleError(message) {
+            const el = document.getElementById('article-error-message');
+            document.getElementById('article-error-text').textContent = message;
+            el.style.display = 'block';
+        }
+
+        function hideArticleMessages() {
+            document.getElementById('article-success-message').style.display = 'none';
+            document.getElementById('article-error-message').style.display = 'none';
         }
     </script>
 </body>

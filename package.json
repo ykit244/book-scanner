@@ -1,5 +1,8 @@
 {
   "name": "book-scanner",
   "version": "1.0.0",
-  "private": true
+  "private": true,
+  "dependencies": {
+    "node-html-parser": "^6.1.0"
+  }
 }
