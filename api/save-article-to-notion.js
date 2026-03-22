@@ -33,7 +33,7 @@ module.exports = async function handler(req, res) {
         select: { name: 'Article' },
       },
       'Category': {
-        select: { name: category || 'General' },
+        multi_select: [{ name: category || 'General' }],
       },
     };
 
@@ -47,7 +47,7 @@ module.exports = async function handler(req, res) {
 
     if (author) {
       properties['Author'] = {
-        rich_text: [{ text: { content: author } }],
+        multi_select: author.split(',').map(a => ({ name: a.trim() })).filter(a => a.name),
       };
     }
 
