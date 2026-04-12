@@ -50,7 +50,7 @@ module.exports = async function handler(req, res) {
     const releaseDate = extractDate(root);
     const language = detectLanguage(root.querySelector('html')?.getAttribute('lang') || '');
     const bodyText = extractBodyText(root);
-    const mediaUrls = extractMediaUrls(root);
+    const mediaUrls = extractMediaUrls(root, url);
 
     return res.status(200).json({
       title: title.trim(),
@@ -155,22 +155,34 @@ function extractJsonLd(root) {
   return null;
 }
 
-function extractMediaUrls(root) {
+function extractMediaUrls(root, pageUrl) {
   const mediaUrls = [];
+  const origin = new URL(pageUrl).origin;
+
+  // Resolve a potentially relative URL to absolute using the page origin
+  function toAbsolute(src) {
+    if (!src) return null;
+    if (src.startsWith('http')) return src;
+    if (src.startsWith('//')) return 'https:' + src;
+    if (src.startsWith('/')) return origin + src;
+    return null; // skip ambiguous relative paths like "images/foo.jpg"
+  }
 
   // Priority 1: OG metadata — site-declared representative media, no size filtering needed
-  const ogImage =
+  const ogImage = toAbsolute(
     root.querySelector('meta[property="og:image:secure_url"]')?.getAttribute('content') ||
     root.querySelector('meta[property="og:image"]')?.getAttribute('content') ||
-    root.querySelector('meta[name="og:image"]')?.getAttribute('content');
-  const ogVideo =
+    root.querySelector('meta[name="og:image"]')?.getAttribute('content')
+  );
+  const ogVideo = toAbsolute(
     root.querySelector('meta[property="og:video"]')?.getAttribute('content') ||
-    root.querySelector('meta[property="og:video:url"]')?.getAttribute('content');
+    root.querySelector('meta[property="og:video:url"]')?.getAttribute('content')
+  );
 
   if (ogImage) mediaUrls.push({ type: 'Image', url: ogImage });
   if (ogVideo) mediaUrls.push({ type: 'Video', url: ogVideo });
 
-  // Priority 2 (fallback): scan <img> tags only when OG media is absent
+  // Priority 2 (fallback): scan <img> and <video> tags only when OG media is absent
   if (mediaUrls.length === 0) {
     const doc = parse(root.toString());
     ['script', 'style', 'nav', 'footer', 'header', 'aside', 'noscript'].forEach(sel =>
@@ -186,12 +198,22 @@ function extractMediaUrls(root) {
       doc.querySelector('#content') ||
       doc;
 
+    // Collect <video> src and poster attributes
+    for (const video of contentEl.querySelectorAll('video')) {
+      const src = toAbsolute(video.getAttribute('src'));
+      const poster = toAbsolute(video.getAttribute('poster'));
+      if (poster) mediaUrls.push({ type: 'Image', url: poster });
+      if (src) mediaUrls.push({ type: 'Video', url: src });
+    }
+
+    // Collect <img> tags
     for (const img of contentEl.querySelectorAll('img')) {
-      const src =
+      const src = toAbsolute(
         img.getAttribute('src') ||
         img.getAttribute('data-src') ||
-        img.getAttribute('data-lazy-src');
-      if (!src || !src.startsWith('http')) continue;
+        img.getAttribute('data-lazy-src')
+      );
+      if (!src) continue;
 
       // Check HTML attributes first (explicit dimensions)
       const attrW = parseInt(img.getAttribute('width') || '0', 10);
