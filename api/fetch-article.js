@@ -159,7 +159,10 @@ function extractMediaUrls(root) {
   const mediaUrls = [];
 
   // Priority 1: OG metadata — site-declared representative media, no size filtering needed
-  const ogImage = root.querySelector('meta[property="og:image"]')?.getAttribute('content');
+  const ogImage =
+    root.querySelector('meta[property="og:image:secure_url"]')?.getAttribute('content') ||
+    root.querySelector('meta[property="og:image"]')?.getAttribute('content') ||
+    root.querySelector('meta[name="og:image"]')?.getAttribute('content');
   const ogVideo =
     root.querySelector('meta[property="og:video"]')?.getAttribute('content') ||
     root.querySelector('meta[property="og:video:url"]')?.getAttribute('content');
@@ -174,18 +177,39 @@ function extractMediaUrls(root) {
       doc.querySelectorAll(sel).forEach(el => el.remove())
     );
 
-    for (const img of doc.querySelectorAll('img')) {
+    // Focus on the main content area to avoid nav/UI images
+    const contentEl =
+      doc.querySelector('article') ||
+      doc.querySelector('main') ||
+      doc.querySelector('[role="main"]') ||
+      doc.querySelector('.article-body') ||
+      doc.querySelector('#content') ||
+      doc;
+
+    for (const img of contentEl.querySelectorAll('img')) {
       const src =
         img.getAttribute('src') ||
         img.getAttribute('data-src') ||
         img.getAttribute('data-lazy-src');
       if (!src || !src.startsWith('http')) continue;
 
-      const w = parseInt(img.getAttribute('width') || '0', 10);
-      const h = parseInt(img.getAttribute('height') || '0', 10);
-      // Only keep substantive images; skip icons, buttons, decorative UI elements
-      if (w >= 400 && h >= 300) {
+      // Check HTML attributes first (explicit dimensions)
+      const attrW = parseInt(img.getAttribute('width') || '0', 10);
+      const attrH = parseInt(img.getAttribute('height') || '0', 10);
+      if (attrW >= 400 && attrH >= 300) {
         mediaUrls.push({ type: 'Image', url: src });
+        continue;
+      }
+
+      // Most modern pages use CSS sizing — no HTML attributes present.
+      // Fall back to URL heuristics: skip obvious icons/logos/avatars/buttons.
+      if (attrW === 0 && attrH === 0) {
+        const lower = src.toLowerCase();
+        const isDecorative = /icon|logo|avatar|badge|button|sprite|pixel|tracking|1x1|placeholder/i.test(lower);
+        const hasImageExt = /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(lower);
+        if (!isDecorative && hasImageExt) {
+          mediaUrls.push({ type: 'Image', url: src });
+        }
       }
     }
   }
