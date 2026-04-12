@@ -23,7 +23,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const { url, title, author, releaseDate, language, category, bodyText } = req.body;
+    const { url, title, author, releaseDate, language, category, bodyText, mediaUrls } = req.body;
 
     const properties = {
       'Media Title': {
@@ -55,15 +55,40 @@ module.exports = async function handler(req, res) {
       properties['Release Date'] = { date: { start: releaseDate } };
     }
 
+    // Build media blocks to append after body text
+    const mediaBlocks = [];
+    if (Array.isArray(mediaUrls) && mediaUrls.length > 0) {
+      mediaBlocks.push({
+        object: 'block',
+        type: 'paragraph',
+        paragraph: {
+          rich_text: [{ type: 'text', text: { content: 'Media' }, annotations: { bold: true } }],
+        },
+      });
+      for (const media of mediaUrls) {
+        mediaBlocks.push({
+          object: 'block',
+          type: 'bulleted_list_item',
+          bulleted_list_item: {
+            rich_text: [{ type: 'text', text: { content: `[${media.type}] ${media.url}` } }],
+          },
+        });
+      }
+    }
+
     // First 100 chunks go in with the page creation
     const allChunks = bodyText ? chunkText(bodyText, 2000) : [];
-    const firstBatch = allChunks.slice(0, 100).map(chunk => ({
-      object: 'block',
-      type: 'paragraph',
-      paragraph: {
-        rich_text: [{ type: 'text', text: { content: chunk } }],
-      },
-    }));
+    const firstBatch = [
+      ...allChunks.slice(0, 100).map(chunk => ({
+        object: 'block',
+        type: 'paragraph',
+        paragraph: {
+          rich_text: [{ type: 'text', text: { content: chunk } }],
+        },
+      })),
+      // Append media blocks in the first request if body text fits within 100 chunks
+      ...(allChunks.length <= 100 ? mediaBlocks : []),
+    ];
 
     const createResponse = await fetch('https://api.notion.com/v1/pages', {
       method: 'POST',
@@ -89,13 +114,18 @@ module.exports = async function handler(req, res) {
     if (allChunks.length > 100) {
       const pageId = data.id;
       for (let i = 100; i < allChunks.length; i += 100) {
-        const batch = allChunks.slice(i, i + 100).map(chunk => ({
-          object: 'block',
-          type: 'paragraph',
-          paragraph: {
-            rich_text: [{ type: 'text', text: { content: chunk } }],
-          },
-        }));
+        const isLastBatch = i + 100 >= allChunks.length;
+        const batch = [
+          ...allChunks.slice(i, i + 100).map(chunk => ({
+            object: 'block',
+            type: 'paragraph',
+            paragraph: {
+              rich_text: [{ type: 'text', text: { content: chunk } }],
+            },
+          })),
+          // Append media blocks after the very last text batch
+          ...(isLastBatch ? mediaBlocks : []),
+        ];
         await fetch(`https://api.notion.com/v1/blocks/${pageId}/children`, {
           method: 'PATCH',
           headers: notionHeaders(),

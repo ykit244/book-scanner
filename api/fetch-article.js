@@ -50,6 +50,7 @@ module.exports = async function handler(req, res) {
     const releaseDate = extractDate(root);
     const language = detectLanguage(root.querySelector('html')?.getAttribute('lang') || '');
     const bodyText = extractBodyText(root);
+    const mediaUrls = extractMediaUrls(root);
 
     return res.status(200).json({
       title: title.trim(),
@@ -57,6 +58,7 @@ module.exports = async function handler(req, res) {
       releaseDate,
       language,
       bodyText,
+      mediaUrls,
     });
 
   } catch (error) {
@@ -151,6 +153,44 @@ function extractJsonLd(root) {
     }
   } catch {}
   return null;
+}
+
+function extractMediaUrls(root) {
+  const mediaUrls = [];
+
+  // Priority 1: OG metadata — site-declared representative media, no size filtering needed
+  const ogImage = root.querySelector('meta[property="og:image"]')?.getAttribute('content');
+  const ogVideo =
+    root.querySelector('meta[property="og:video"]')?.getAttribute('content') ||
+    root.querySelector('meta[property="og:video:url"]')?.getAttribute('content');
+
+  if (ogImage) mediaUrls.push({ type: 'Image', url: ogImage });
+  if (ogVideo) mediaUrls.push({ type: 'Video', url: ogVideo });
+
+  // Priority 2 (fallback): scan <img> tags only when OG media is absent
+  if (mediaUrls.length === 0) {
+    const doc = parse(root.toString());
+    ['script', 'style', 'nav', 'footer', 'header', 'aside', 'noscript'].forEach(sel =>
+      doc.querySelectorAll(sel).forEach(el => el.remove())
+    );
+
+    for (const img of doc.querySelectorAll('img')) {
+      const src =
+        img.getAttribute('src') ||
+        img.getAttribute('data-src') ||
+        img.getAttribute('data-lazy-src');
+      if (!src || !src.startsWith('http')) continue;
+
+      const w = parseInt(img.getAttribute('width') || '0', 10);
+      const h = parseInt(img.getAttribute('height') || '0', 10);
+      // Only keep substantive images; skip icons, buttons, decorative UI elements
+      if (w >= 400 && h >= 300) {
+        mediaUrls.push({ type: 'Image', url: src });
+      }
+    }
+  }
+
+  return mediaUrls;
 }
 
 function extractBodyText(root) {
