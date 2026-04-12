@@ -182,8 +182,10 @@ function extractMediaUrls(root, pageUrl) {
   if (ogImage) mediaUrls.push({ type: 'Image', url: ogImage });
   if (ogVideo) mediaUrls.push({ type: 'Video', url: ogVideo });
 
-  // Priority 2 (fallback): scan <img> and <video> tags only when OG media is absent
-  if (mediaUrls.length === 0) {
+  // Always scan article body for additional images — OG image is just the cover,
+  // articles typically have many more figures and illustrations worth keeping.
+  const seen = new Set(mediaUrls.map(m => m.url));
+  {
     const doc = parse(root.toString());
     ['script', 'style', 'nav', 'footer', 'header', 'aside', 'noscript'].forEach(sel =>
       doc.querySelectorAll(sel).forEach(el => el.remove())
@@ -198,12 +200,16 @@ function extractMediaUrls(root, pageUrl) {
       doc.querySelector('#content') ||
       doc;
 
+    function addMedia(type, url) {
+      if (!url || seen.has(url)) return;
+      seen.add(url);
+      mediaUrls.push({ type, url });
+    }
+
     // Collect <video> src and poster attributes
     for (const video of contentEl.querySelectorAll('video')) {
-      const src = toAbsolute(video.getAttribute('src'));
-      const poster = toAbsolute(video.getAttribute('poster'));
-      if (poster) mediaUrls.push({ type: 'Image', url: poster });
-      if (src) mediaUrls.push({ type: 'Video', url: src });
+      addMedia('Image', toAbsolute(video.getAttribute('poster')));
+      addMedia('Video', toAbsolute(video.getAttribute('src')));
     }
 
     // Collect <img> tags
@@ -219,7 +225,7 @@ function extractMediaUrls(root, pageUrl) {
       const attrW = parseInt(img.getAttribute('width') || '0', 10);
       const attrH = parseInt(img.getAttribute('height') || '0', 10);
       if (attrW >= 400 && attrH >= 300) {
-        mediaUrls.push({ type: 'Image', url: src });
+        addMedia('Image', src);
         continue;
       }
 
@@ -230,7 +236,7 @@ function extractMediaUrls(root, pageUrl) {
         const isDecorative = /icon|logo|avatar|badge|button|sprite|pixel|tracking|1x1|placeholder/i.test(lower);
         const hasImageExt = /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(lower);
         if (!isDecorative && hasImageExt) {
-          mediaUrls.push({ type: 'Image', url: src });
+          addMedia('Image', src);
         }
       }
     }
