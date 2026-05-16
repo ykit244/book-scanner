@@ -33,7 +33,7 @@ module.exports = async function handler(req, res) {
         select: { name: 'Article' },
       },
       'Category': {
-        multi_select: [{ name: category || 'General' }],
+        multi_select: (Array.isArray(category) ? category : [category || 'General']).map(c => ({ name: c })),
       },
     };
 

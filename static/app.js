@@ -376,7 +376,7 @@ async function saveArticleToNotion() {
                 author: document.getElementById('article-author').value.trim(),
                 releaseDate: document.getElementById('article-date').value,
                 language: document.getElementById('article-language').value,
-                category: document.getElementById('article-category').value,
+                category: Array.from(document.getElementById('article-category').selectedOptions).map(o => o.value),
                 bodyText: articleBodyText,
                 mediaUrls: articleMediaUrls,
                 screenshotUrl,
@@ -391,7 +391,7 @@ async function saveArticleToNotion() {
                 document.getElementById('article-success-message').style.display = 'none';
             }, 5000);
             document.getElementById('article-url').value = '';
-            document.getElementById('article-category').value = 'General';
+            Array.from(document.getElementById('article-category').options).forEach(o => { o.selected = o.value === 'General'; });
             document.getElementById('article-fields').style.display = 'none';
             articleBodyText = '';
             articleMediaUrls = [];
