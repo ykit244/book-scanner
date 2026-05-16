@@ -1,4 +1,4 @@
-const NOTION_TOKEN = process.env.NOTION_TOKEN;
+﻿const NOTION_TOKEN = process.env.NOTION_TOKEN;
 const DATABASE_ID = process.env.NOTION_ARTICLE_DATABASE_ID;
 
 module.exports = async function handler(req, res) {
@@ -23,7 +23,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const { url, title, author, releaseDate, language, category, bodyText, mediaUrls } = req.body;
+    const { url, title, author, releaseDate, language, category, bodyText, mediaUrls, screenshotUrl } = req.body;
 
     const properties = {
       'Media Title': {
@@ -78,7 +78,15 @@ module.exports = async function handler(req, res) {
 
     // First 100 chunks go in with the page creation
     const allChunks = bodyText ? chunkText(bodyText, 2000) : [];
+    const screenshotBlock = screenshotUrl
+      ? [{
+          object: 'block',
+          type: 'image',
+          image: { type: 'external', external: { url: screenshotUrl } },
+        }]
+      : [];
     const firstBatch = [
+      ...screenshotBlock,
       ...allChunks.slice(0, 100).map(chunk => ({
         object: 'block',
         type: 'paragraph',

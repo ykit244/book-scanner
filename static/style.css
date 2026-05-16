@@ -476,3 +476,9 @@ h1 {
     color: #999;
     margin-bottom: 16px;
 }
+
+#screenshot-section.highlight {
+    background: #fff8e1;
+    border: 1.5px solid #f5a623;
+    padding: 10px;
+}

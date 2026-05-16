@@ -296,6 +296,9 @@ function switchTab(tab) {
 // ── Article Bookmark ───────────────────────────────────────────
 let articleBodyText = '';
 let articleMediaUrls = [];
+let screenshotUrl = '';
+let screenshotBase64 = '';
+let screenshotMimeType = '';
 
 async function fetchArticle() {
     const url = document.getElementById('article-url').value.trim();
@@ -327,6 +330,8 @@ async function fetchArticle() {
 
         if (data.warning) {
             showArticleError(data.warning);
+            nudgeScreenshot();
+            return;
         }
 
         document.getElementById('article-title').value = data.title || '';
@@ -349,6 +354,7 @@ async function fetchArticle() {
     } catch (error) {
         status.textContent = '';
         showArticleError(error.message || 'Failed to fetch article. Check the URL and try again.');
+        nudgeScreenshot();
     }
 
     btn.disabled = false;
@@ -374,6 +380,7 @@ async function saveArticleToNotion() {
                 category: document.getElementById('article-category').value,
                 bodyText: articleBodyText,
                 mediaUrls: articleMediaUrls,
+                screenshotUrl,
             }),
         });
 
@@ -389,6 +396,14 @@ async function saveArticleToNotion() {
             document.getElementById('article-fields').style.display = 'none';
             articleBodyText = '';
             articleMediaUrls = [];
+            screenshotUrl = '';
+            screenshotBase64 = '';
+            screenshotMimeType = '';
+            document.getElementById('screenshot-input').value = '';
+            document.getElementById('screenshot-preview').style.display = 'none';
+            document.getElementById('screenshot-preview').src = '';
+            document.getElementById('screenshot-filename').textContent = '';
+            document.getElementById('analyse-btn').style.display = 'none';
         } else {
             showArticleError(data.error || 'Failed to save to Notion.');
         }
@@ -408,4 +423,110 @@ function showArticleError(message) {
 function hideArticleMessages() {
     document.getElementById('article-success-message').style.display = 'none';
     document.getElementById('article-error-message').style.display = 'none';
+}
+
+function nudgeScreenshot() {
+    const section = document.getElementById('screenshot-section');
+    section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    section.classList.add('highlight');
+    let hint = document.getElementById('screenshot-hint');
+    if (!hint) {
+        hint = document.createElement('p');
+        hint.id = 'screenshot-hint';
+        hint.style.cssText = 'margin-top:8px; font-size:13px; color:#b8860b; font-weight:500;';
+        hint.textContent = "Can't access this page. Take a screenshot on your phone or browser and upload it below.";
+        section.appendChild(hint);
+    }
+    setTimeout(() => section.classList.remove('highlight'), 4000);
+}
+
+function onScreenshotSelected(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    screenshotMimeType = file.type || 'image/jpeg';
+    document.getElementById('screenshot-filename').textContent = file.name;
+
+    const preview = document.getElementById('screenshot-preview');
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = 'block';
+
+    document.getElementById('analyse-btn').style.display = 'block';
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        screenshotBase64 = e.target.result.split(',')[1];
+    };
+    reader.readAsDataURL(file);
+}
+
+async function analyseScreenshot() {
+    if (!screenshotBase64) {
+        showArticleError('No screenshot selected.');
+        return;
+    }
+
+    const btn = document.getElementById('analyse-btn');
+    btn.disabled = true;
+    btn.textContent = 'Uploading…';
+
+    const status = document.getElementById('article-status');
+    document.getElementById('article-fields').style.display = 'none';
+    hideArticleMessages();
+
+    try {
+        status.textContent = 'Uploading screenshot to Drive…';
+        const filename = `screenshot-${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
+
+        const uploadRes = await fetch('/api/upload-to-drive', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                imageBase64: screenshotBase64,
+                mimeType: screenshotMimeType,
+                filename,
+            }),
+        });
+        const uploadData = await uploadRes.json();
+        if (!uploadRes.ok) throw new Error(uploadData.error || 'Upload failed');
+        screenshotUrl = uploadData.url;
+
+        status.textContent = 'Analysing with Gemini…';
+        const analyseRes = await fetch('/api/analyze-screenshot', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                imageBase64: screenshotBase64,
+                mimeType: screenshotMimeType,
+            }),
+        });
+        const analyseData = await analyseRes.json();
+        if (!analyseRes.ok) throw new Error(analyseData.error || 'Analysis failed');
+
+        document.getElementById('article-title').value = analyseData.title || '';
+        document.getElementById('article-author').value = analyseData.author || '';
+        document.getElementById('article-date').value = analyseData.releaseDate || '';
+
+        const langSelect = document.getElementById('article-language');
+        langSelect.value = ['English', 'Chinese'].includes(analyseData.language)
+            ? analyseData.language : 'Other';
+
+        articleBodyText = analyseData.bodyText || '';
+        document.getElementById('article-text-preview').value = articleBodyText;
+
+        const lengthEl = document.getElementById('article-text-length');
+        lengthEl.textContent = articleBodyText
+            ? `~${articleBodyText.length.toLocaleString()} characters — will be saved to the Notion page body.`
+            : 'No text extracted. You can paste the article text manually above.';
+
+        document.getElementById('article-fields').style.display = 'block';
+        status.textContent = '';
+
+    } catch (error) {
+        status.textContent = '';
+        showArticleError(error.message || 'Failed to analyse screenshot.');
+    }
+
+    btn.disabled = false;
+    btn.textContent = '🤖 Analyse Screenshot';
 }
