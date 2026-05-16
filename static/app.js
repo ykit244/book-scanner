@@ -297,8 +297,7 @@ function switchTab(tab) {
 let articleBodyText = '';
 let articleMediaUrls = [];
 let screenshotUrl = '';
-let screenshotBase64 = '';
-let screenshotMimeType = '';
+let screenshotImages = []; // [{base64, mimeType, previewUrl}]
 
 async function fetchArticle() {
     const url = document.getElementById('article-url').value.trim();
@@ -397,13 +396,10 @@ async function saveArticleToNotion() {
             articleBodyText = '';
             articleMediaUrls = [];
             screenshotUrl = '';
-            screenshotBase64 = '';
-            screenshotMimeType = '';
+            screenshotImages.forEach(img => URL.revokeObjectURL(img.previewUrl));
+            screenshotImages = [];
+            updateScreenshotsPreview();
             document.getElementById('screenshot-input').value = '';
-            document.getElementById('screenshot-preview').style.display = 'none';
-            document.getElementById('screenshot-preview').src = '';
-            document.getElementById('screenshot-filename').textContent = '';
-            document.getElementById('analyse-btn').style.display = 'none';
         } else {
             showArticleError(data.error || 'Failed to save to Notion.');
         }
@@ -440,29 +436,60 @@ function nudgeScreenshot() {
     setTimeout(() => section.classList.remove('highlight'), 4000);
 }
 
-function onScreenshotSelected(event) {
-    const file = event.target.files[0];
-    if (!file) return;
+function onScreenshotsSelected(event) {
+    const files = Array.from(event.target.files);
+    if (!files.length) return;
 
-    screenshotMimeType = file.type || 'image/jpeg';
-    document.getElementById('screenshot-filename').textContent = file.name;
+    files.forEach(file => {
+        const mimeType = file.type || 'image/jpeg';
+        const previewUrl = URL.createObjectURL(file);
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            screenshotImages.push({ base64: e.target.result.split(',')[1], mimeType, previewUrl });
+            updateScreenshotsPreview();
+        };
+        reader.readAsDataURL(file);
+    });
 
-    const preview = document.getElementById('screenshot-preview');
-    preview.src = URL.createObjectURL(file);
-    preview.style.display = 'block';
+    event.target.value = '';
+}
 
-    document.getElementById('analyse-btn').style.display = 'block';
+function updateScreenshotsPreview() {
+    const grid = document.getElementById('screenshots-grid');
+    const previewEl = document.getElementById('screenshots-preview');
+    const analyseBtn = document.getElementById('analyse-btn');
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        screenshotBase64 = e.target.result.split(',')[1];
-    };
-    reader.readAsDataURL(file);
+    if (screenshotImages.length === 0) {
+        previewEl.style.display = 'none';
+        analyseBtn.style.display = 'none';
+        return;
+    }
+
+    previewEl.style.display = 'block';
+    analyseBtn.style.display = 'block';
+
+    grid.innerHTML = '';
+    screenshotImages.forEach((img, index) => {
+        const item = document.createElement('div');
+        item.className = 'image-item';
+        item.innerHTML = `
+            <img src="${img.previewUrl}" alt="Screenshot ${index + 1}">
+            <div class="image-number">${index + 1}</div>
+            <button class="remove-image" onclick="removeScreenshot(${index})">×</button>
+        `;
+        grid.appendChild(item);
+    });
+}
+
+function removeScreenshot(index) {
+    URL.revokeObjectURL(screenshotImages[index].previewUrl);
+    screenshotImages.splice(index, 1);
+    updateScreenshotsPreview();
 }
 
 async function analyseScreenshot() {
-    if (!screenshotBase64) {
-        showArticleError('No screenshot selected.');
+    if (screenshotImages.length === 0) {
+        showArticleError('No screenshots selected.');
         return;
     }
 
@@ -475,13 +502,13 @@ async function analyseScreenshot() {
     hideArticleMessages();
 
     try {
-        status.textContent = 'Analysing with Gemini…';
+        const count = screenshotImages.length;
+        status.textContent = `Analysing ${count} screenshot${count > 1 ? 's' : ''} with Gemini…`;
         const analyseRes = await fetch('/api/analyze-screenshot', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                imageBase64: screenshotBase64,
-                mimeType: screenshotMimeType,
+                images: screenshotImages.map(img => ({ imageBase64: img.base64, mimeType: img.mimeType })),
             }),
         });
         const analyseData = await analyseRes.json();

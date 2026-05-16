@@ -129,27 +129,29 @@
 
             <!-- Screenshot upload -->
             <div class="field-row" id="screenshot-section" style="margin-top: 8px; border-radius: 8px; transition: background 0.4s;">
-              <label style="display:block; margin-bottom:6px; color:#333; font-weight:500;">Or upload a screenshot:</label>
-              <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                <input type="file" id="screenshot-input" accept="image/*"
-                       style="display:none" onchange="onScreenshotSelected(event)">
-                <button type="button" class="camera-btn"
-                        style="width:auto; padding:10px 18px; font-size:14px;"
+              <label style="display:block; margin-bottom:6px; color:#333; font-weight:500;">Or upload screenshots:</label>
+              <input type="file" id="screenshot-input" accept="image/*" multiple
+                     style="display:none" onchange="onScreenshotsSelected(event)">
+              <button type="button" class="camera-btn"
+                      style="width:auto; padding:10px 18px; font-size:14px;"
+                      onclick="document.getElementById('screenshot-input').click()">
+                📸 Choose Screenshots
+              </button>
+              <div id="screenshots-preview" style="display:none; margin-top:10px;">
+                <div class="images-grid" id="screenshots-grid"></div>
+                <button type="button" class="add-another-btn"
+                        style="margin-top:4px;"
                         onclick="document.getElementById('screenshot-input').click()">
-                  📸 Choose Screenshot
+                  ➕ Add More Screenshots
                 </button>
-                <img id="screenshot-preview" src="" alt="preview"
-                     style="display:none; height:60px; border-radius:6px; border:1px solid #ddd;">
-                <span id="screenshot-filename"
-                      style="font-size:13px; color:#666;"></span>
               </div>
             </div>
 
-            <!-- Analyse Screenshot button (shown only after image selected) -->
+            <!-- Analyse Screenshots button (shown only after images selected) -->
             <button class="fetch-btn" id="analyse-btn"
                     style="display:none; background:#34C759; margin-top:8px;"
                     onclick="analyseScreenshot()">
-              🤖 Analyse Screenshot
+              🤖 Analyse Screenshots
             </button>
 
             <button class="fetch-btn" id="fetch-btn" onclick="fetchArticle()">
