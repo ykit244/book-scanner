@@ -1,0 +1,17 @@
+# Claude Code project instructions (keep local only)
+CLAUDE.md
+
+# Dependencies
+node_modules/
+package-lock.json
+
+# Vercel local config
+.vercel/
+
+# Backup files
+*_backup.*
+*.backup.*
+
+# Environment variables
+.env
+.env.local
