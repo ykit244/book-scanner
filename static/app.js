@@ -468,29 +468,13 @@ async function analyseScreenshot() {
 
     const btn = document.getElementById('analyse-btn');
     btn.disabled = true;
-    btn.textContent = 'Uploading…';
+    btn.textContent = 'Analysing…';
 
     const status = document.getElementById('article-status');
     document.getElementById('article-fields').style.display = 'none';
     hideArticleMessages();
 
     try {
-        status.textContent = 'Uploading screenshot to Drive…';
-        const filename = `screenshot-${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
-
-        const uploadRes = await fetch('/api/upload-to-drive', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                imageBase64: screenshotBase64,
-                mimeType: screenshotMimeType,
-                filename,
-            }),
-        });
-        const uploadData = await uploadRes.json();
-        if (!uploadRes.ok) throw new Error(uploadData.error || 'Upload failed');
-        screenshotUrl = uploadData.url;
-
         status.textContent = 'Analysing with Gemini…';
         const analyseRes = await fetch('/api/analyze-screenshot', {
             method: 'POST',
