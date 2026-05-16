@@ -421,6 +421,12 @@ function hideArticleMessages() {
     document.getElementById('article-error-message').style.display = 'none';
 }
 
+function showManualEntry() {
+    hideArticleMessages();
+    document.getElementById('article-status').textContent = '';
+    document.getElementById('article-fields').style.display = 'block';
+}
+
 function nudgeScreenshot() {
     const section = document.getElementById('screenshot-section');
     section.scrollIntoView({ behavior: 'smooth', block: 'center' });
