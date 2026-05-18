@@ -178,7 +178,10 @@
 
                 <div class="field-group">
                     <label for="article-author">Author:</label>
-                    <input type="text" class="field-input" id="article-author" placeholder="Leave blank if unknown">
+                    <div class="autocomplete-wrapper">
+                        <input type="text" class="field-input" id="article-author" placeholder="Leave blank if unknown" autocomplete="off">
+                        <div class="autocomplete-dropdown" id="author-dropdown"></div>
+                    </div>
                 </div>
 
                 <div class="field-group">
@@ -196,8 +199,11 @@
                 </div>
 
                 <div class="field-group">
-                    <label for="article-text-preview">Article Text:</label>
-                    <textarea class="field-input" id="article-text-preview" rows="6" placeholder="Paste or type article text here..." oninput="articleBodyText = this.value"></textarea>
+                    <div class="field-label-row">
+                        <label for="article-text-preview">Article Text:</label>
+                        <button type="button" class="text-expand-btn" onclick="expandArticleText()" title="Expand to full screen">⛶</button>
+                    </div>
+                    <textarea class="field-input" id="article-text-preview" rows="8" placeholder="Paste or type article text here..." oninput="articleBodyText = this.value"></textarea>
                     <div class="text-preview-label" id="article-text-length"></div>
                 </div>
 
@@ -219,5 +225,38 @@
     </div>
 
     <script src="/static/app.js"></script>
+
+    <!-- Login overlay -->
+    <div id="login-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.75); z-index:3000; align-items:center; justify-content:center;">
+        <div style="background:white; border-radius:16px; padding:36px 32px; max-width:340px; width:90%; box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+            <div style="text-align:center; margin-bottom:20px;">
+                <div style="font-size:36px; margin-bottom:8px;">🔐</div>
+                <h2 style="font-size:20px; color:#333; margin:0 0 6px;">Access Required</h2>
+                <p style="font-size:14px; color:#888; margin:0;">Enter the access password to continue.</p>
+            </div>
+            <input type="password" id="login-password" placeholder="Password"
+                   style="width:100%; padding:13px 14px; border:1.5px solid #ddd; border-radius:8px; font-size:16px; margin-bottom:12px; box-sizing:border-box; outline:none;"
+                   onkeydown="if(event.key==='Enter') submitLogin()"
+                   onfocus="this.style.borderColor='#007AFF'" onblur="this.style.borderColor='#ddd'">
+            <button onclick="submitLogin()"
+                    style="width:100%; padding:14px; background:#007AFF; color:white; border:none; border-radius:8px; font-size:16px; cursor:pointer; font-weight:600;">
+                Sign In
+            </button>
+            <div id="login-error" style="display:none; color:#721c24; background:#f8d7da; border:1px solid #f5c6cb; padding:10px 12px; border-radius:6px; margin-top:12px; font-size:14px; text-align:center;">
+                Incorrect password. Please try again.
+            </div>
+        </div>
+    </div>
+
+    <!-- Full-screen article text overlay -->
+    <div id="text-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:1000; padding:16px; flex-direction:column; box-sizing:border-box;">
+        <div style="background:white; border-radius:12px; padding:16px; display:flex; flex-direction:column; flex:1; min-height:0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <span style="font-weight:600; font-size:15px; color:#333;">Article Text</span>
+                <button type="button" onclick="closeArticleTextOverlay()" style="background:none; border:1px solid #ddd; border-radius:6px; cursor:pointer; padding:4px 12px; font-size:20px; color:#333; line-height:1;">×</button>
+            </div>
+            <textarea id="overlay-text" style="flex:1; width:100%; border:1px solid #ddd; border-radius:8px; padding:12px; font-size:15px; font-family:inherit; resize:none; min-height:0; box-sizing:border-box;" placeholder="Paste or type article text here..." oninput="articleBodyText = this.value"></textarea>
+        </div>
+    </div>
 </body>
 </html>

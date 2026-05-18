@@ -2,10 +2,13 @@
 // File location: api/test-vision.js
 
 const GOOGLE_VISION_API_KEY = process.env.GOOGLE_VISION_API_KEY;
+const { checkAuth } = require('./_auth');
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  
+
+  if (!checkAuth(req, res)) return;
+
   // Check if API key is set
   if (!GOOGLE_VISION_API_KEY) {
     return res.status(500).json({ 

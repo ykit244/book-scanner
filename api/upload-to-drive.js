@@ -2,6 +2,7 @@
 // Run via: POST /api/upload-to-drive
 
 const crypto = require('crypto');
+const { checkAuth } = require('./_auth');
 
 function base64url(buffer) {
   return buffer.toString('base64')
@@ -39,6 +40,8 @@ module.exports = async function handler(req, res) {
 
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  if (!checkAuth(req, res)) return;
 
   const { imageBase64, mimeType, filename } = req.body;
   if (!imageBase64) return res.status(400).json({ error: 'imageBase64 is required' });

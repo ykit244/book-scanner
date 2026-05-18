@@ -1,4 +1,5 @@
 const { parse } = require('node-html-parser');
+const { checkAuth } = require('./_auth');
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -13,6 +14,8 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  if (!checkAuth(req, res)) return;
 
   const { url } = req.body;
   if (!url) {

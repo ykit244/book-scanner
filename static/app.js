@@ -2,7 +2,14 @@ let booksList = [];
 let selectedOrientation = 'horizontal';
 let capturedImages = [];
 
-window.addEventListener('DOMContentLoaded', loadBooks);
+window.addEventListener('DOMContentLoaded', async () => {
+    const authenticated = await checkAuthStatus();
+    if (authenticated) {
+        loadBooks();
+        loadArticleAuthors();
+    }
+    setupAuthorAutocomplete();
+});
 
 async function loadBooks() {
     try {
@@ -285,6 +292,124 @@ function hideMessages() {
     document.getElementById('error-message').style.display = 'none';
 }
 
+// ── Auth ──────────────────────────────────────────────────────
+async function checkAuthStatus() {
+    try {
+        const res = await fetch('/api/check-auth');
+        if (res.status === 401) {
+            const overlay = document.getElementById('login-overlay');
+            overlay.style.display = 'flex';
+            setTimeout(() => document.getElementById('login-password').focus(), 50);
+            return false;
+        }
+        return true;
+    } catch (e) {
+        return true; // network error — don't block UI
+    }
+}
+
+async function submitLogin() {
+    const passwordEl = document.getElementById('login-password');
+    const errorEl = document.getElementById('login-error');
+    errorEl.style.display = 'none';
+
+    const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: passwordEl.value }),
+    });
+
+    if (res.ok) {
+        document.getElementById('login-overlay').style.display = 'none';
+        passwordEl.value = '';
+        loadBooks();
+        loadArticleAuthors();
+    } else {
+        errorEl.style.display = 'block';
+        passwordEl.value = '';
+        passwordEl.focus();
+    }
+}
+
+// ── Author autocomplete ────────────────────────────────────────
+let articleAuthors = [];
+
+async function loadArticleAuthors() {
+    try {
+        const res = await fetch('/api/get-authors');
+        const data = await res.json();
+        articleAuthors = data.authors || [];
+    } catch (e) {
+        articleAuthors = [];
+    }
+}
+
+function fuzzyScore(query, candidate) {
+    const q = query.toLowerCase();
+    const c = candidate.toLowerCase();
+    if (c.startsWith(q)) return 3;
+    if (c.includes(q)) return 2;
+    // character-sequence fuzzy: all query chars appear in order
+    let qi = 0;
+    for (let ci = 0; ci < c.length && qi < q.length; ci++) {
+        if (c[ci] === q[qi]) qi++;
+    }
+    return qi === q.length ? 1 : 0;
+}
+
+function showAuthorDropdown(query) {
+    const dropdown = document.getElementById('author-dropdown');
+    dropdown.innerHTML = '';
+
+    if (!query) {
+        dropdown.classList.remove('open');
+        return;
+    }
+
+    const matches = articleAuthors
+        .map(a => ({ name: a, score: fuzzyScore(query, a) }))
+        .filter(a => a.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 8)
+        .map(a => a.name);
+
+    if (matches.length === 0) {
+        dropdown.classList.remove('open');
+        return;
+    }
+
+    matches.forEach(name => {
+        const item = document.createElement('div');
+        item.className = 'autocomplete-item';
+        item.dataset.name = name;
+        item.textContent = name;
+        dropdown.appendChild(item);
+    });
+    dropdown.classList.add('open');
+}
+
+function setupAuthorAutocomplete() {
+    const input = document.getElementById('article-author');
+    const dropdown = document.getElementById('author-dropdown');
+
+    input.addEventListener('input', () => showAuthorDropdown(input.value.trim()));
+    input.addEventListener('focus', () => {
+        if (input.value.trim()) showAuthorDropdown(input.value.trim());
+    });
+    input.addEventListener('blur', () => {
+        setTimeout(() => dropdown.classList.remove('open'), 150);
+    });
+
+    dropdown.addEventListener('mousedown', (e) => {
+        e.preventDefault(); // keep input focused, prevents blur
+        const item = e.target.closest('.autocomplete-item');
+        if (item) {
+            input.value = item.dataset.name;
+            dropdown.classList.remove('open');
+        }
+    });
+}
+
 // ── Tab switching ──────────────────────────────────────────────
 function switchTab(tab) {
     document.getElementById('tab-book').style.display = tab === 'book' ? 'block' : 'none';
@@ -366,15 +491,19 @@ async function saveArticleToNotion() {
     saveBtn.textContent = 'Saving…';
     hideArticleMessages();
 
+    const title = document.getElementById('article-title').value.trim();
+    const releaseDate = document.getElementById('article-date').value;
+    const titleWithDate = releaseDate ? `${title} (${releaseDate})` : title;
+
     try {
         const response = await fetch('/api/save-article-to-notion', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 url: document.getElementById('article-url').value.trim(),
-                title: document.getElementById('article-title').value.trim(),
+                title: titleWithDate,
                 author: document.getElementById('article-author').value.trim(),
-                releaseDate: document.getElementById('article-date').value,
+                releaseDate,
                 language: document.getElementById('article-language').value,
                 category: Array.from(document.getElementById('article-category').selectedOptions).map(o => o.value),
                 bodyText: articleBodyText,
@@ -393,6 +522,12 @@ async function saveArticleToNotion() {
             document.getElementById('article-url').value = '';
             Array.from(document.getElementById('article-category').options).forEach(o => { o.selected = o.value === 'General'; });
             document.getElementById('article-fields').style.display = 'none';
+            document.getElementById('article-title').value = '';
+            document.getElementById('article-author').value = '';
+            document.getElementById('article-date').value = '';
+            document.getElementById('article-language').value = 'English';
+            document.getElementById('article-text-preview').value = '';
+            document.getElementById('article-text-length').textContent = '';
             articleBodyText = '';
             articleMediaUrls = [];
             screenshotUrl = '';
@@ -491,6 +626,23 @@ function removeScreenshot(index) {
     URL.revokeObjectURL(screenshotImages[index].previewUrl);
     screenshotImages.splice(index, 1);
     updateScreenshotsPreview();
+}
+
+function expandArticleText() {
+    document.getElementById('overlay-text').value = document.getElementById('article-text-preview').value;
+    document.getElementById('text-overlay').style.display = 'flex';
+    document.getElementById('overlay-text').focus();
+}
+
+function closeArticleTextOverlay() {
+    const text = document.getElementById('overlay-text').value;
+    document.getElementById('article-text-preview').value = text;
+    articleBodyText = text;
+    const lengthEl = document.getElementById('article-text-length');
+    lengthEl.textContent = text
+        ? `~${text.length.toLocaleString()} characters — will be saved to the Notion page body.`
+        : 'No text extracted. You can paste the article text manually above.';
+    document.getElementById('text-overlay').style.display = 'none';
 }
 
 async function analyseScreenshot() {

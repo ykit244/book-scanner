@@ -2,6 +2,7 @@
 // File location: api/extract-text.js
 
 const GOOGLE_VISION_API_KEY = process.env.GOOGLE_VISION_API_KEY;
+const { checkAuth } = require('./_auth');
 
 module.exports = async function handler(req, res) {
   // Enable CORS
@@ -20,6 +21,8 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  if (!checkAuth(req, res)) return;
 
   // Check if API key is set
   if (!GOOGLE_VISION_API_KEY) {

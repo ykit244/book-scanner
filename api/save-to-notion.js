@@ -3,6 +3,7 @@
 
 const NOTION_TOKEN = process.env.NOTION_TOKEN;
 const DATABASE_ID = process.env.NOTION_DATABASE_ID;
+const { checkAuth } = require('./_auth');
 
 module.exports = async function handler(req, res) {
   // Enable CORS
@@ -21,6 +22,8 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  if (!checkAuth(req, res)) return;
 
   // Check if environment variables are set
   if (!NOTION_TOKEN || !DATABASE_ID) {

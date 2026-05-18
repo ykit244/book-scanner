@@ -1,5 +1,6 @@
 ﻿const NOTION_TOKEN = process.env.NOTION_TOKEN;
 const DATABASE_ID = process.env.NOTION_ARTICLE_DATABASE_ID;
+const { checkAuth } = require('./_auth');
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -14,6 +15,8 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  if (!checkAuth(req, res)) return;
 
   if (!NOTION_TOKEN || !DATABASE_ID) {
     return res.status(500).json({
