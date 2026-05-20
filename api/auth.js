@@ -1,5 +1,6 @@
 // POST: validate password → set HttpOnly auth cookie
 // DELETE: clear cookie (logout)
+const { makeToken } = require('./_auth');
 
 module.exports = async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -21,9 +22,9 @@ module.exports = async function handler(req, res) {
         if (!secret || password !== secret) {
             return res.status(401).json({ error: 'Incorrect password' });
         }
-        const maxAge = 60 * 60 * 24 * 365; // 1 year
+        const maxAge = 60 * 60 * 24 * 30; // 30 days, matches token expiry
         res.setHeader('Set-Cookie',
-            `app_auth=${secret}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Strict${isSecure ? '; Secure' : ''}`
+            `app_auth=${makeToken(secret)}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Strict${isSecure ? '; Secure' : ''}`
         );
         return res.status(200).json({ ok: true });
     }
